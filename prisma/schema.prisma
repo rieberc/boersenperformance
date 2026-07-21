@@ -1,0 +1,52 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum AssetType {
+  STOCK
+  ETF
+  CRYPTO
+}
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String
+  name         String?
+  createdAt    DateTime  @default(now())
+  holdings     Holding[]
+}
+
+model Holding {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assetType AssetType
+  symbol    String
+  name      String
+  currency  String
+  quantity  Decimal
+  buyPrice  Decimal
+  buyDate   DateTime
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+}
+
+model PriceCache {
+  symbol    String   @id
+  price     Decimal
+  currency  String
+  updatedAt DateTime @updatedAt
+}
+
+model FxRateCache {
+  pair      String   @id
+  rate      Decimal
+  updatedAt DateTime @updatedAt
+}
