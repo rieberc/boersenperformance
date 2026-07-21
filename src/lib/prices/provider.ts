@@ -14,8 +14,14 @@ export type PriceQuote = {
   currency: string;
 };
 
+export type HistoricalPricePoint = {
+  date: string;
+  price: number;
+};
+
 export interface PriceProvider {
   search(query: string): Promise<SecuritySearchResult[]>;
   quotes(symbols: string[]): Promise<PriceQuote[]>;
   fxRate(from: string, to: string): Promise<number | null>;
+  historicalPrices(symbol: string, start: Date, end: Date): Promise<HistoricalPricePoint[]>;
 }

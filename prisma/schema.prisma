@@ -16,6 +16,7 @@ enum AssetType {
 enum TransactionType {
   BUY
   SELL
+  DIVIDEND
 }
 
 model User {
@@ -38,6 +39,8 @@ model Holding {
   currency  String
   quantity  Decimal
   price     Decimal
+  fee       Decimal         @default(0)
+  tax       Decimal         @default(0)
   date      DateTime
   createdAt DateTime        @default(now())
 

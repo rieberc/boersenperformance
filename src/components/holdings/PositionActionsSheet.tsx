@@ -29,7 +29,7 @@ export function PositionActionsSheet({
   function handleDelete() {
     startDeleteTransition(async () => {
       await deletePositionAction(holding.symbol);
-      await queryClient.invalidateQueries({ queryKey: ["portfolio-summary"] });
+      await queryClient.invalidateQueries({ queryKey: ["portfolio"] });
       handleClose();
     });
   }

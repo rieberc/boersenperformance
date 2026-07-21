@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireUserId } from "@/lib/require-user";
 import { toNumber } from "@/lib/utils/decimal";
-import { holdingSchema, sellSchema } from "@/lib/validation/holding";
+import { editTransactionSchema, holdingSchema, sellSchema } from "@/lib/validation/holding";
 
 export type HoldingFormState = { error?: string } | undefined;
 
@@ -43,6 +43,7 @@ async function getNetQuantity(userId: string, symbol: string): Promise<number> {
   });
 
   return transactions.reduce((net, t) => {
+    if (t.type === "DIVIDEND") return net;
     const qty = toNumber(t.quantity);
     return t.type === "SELL" ? net - qty : net + qty;
   }, 0);
@@ -100,5 +101,46 @@ export async function createSaleAction(
 export async function deletePositionAction(symbol: string): Promise<void> {
   const userId = await requireUserId();
   await prisma.holding.deleteMany({ where: { symbol, userId } });
+  revalidatePath("/dashboard");
+}
+
+export async function updateTransactionAction(
+  id: string,
+  _prevState: HoldingFormState,
+  formData: FormData,
+): Promise<HoldingFormState> {
+  const userId = await requireUserId();
+
+  const parsed = editTransactionSchema.safeParse({
+    type: formData.get("type"),
+    quantity: formData.get("quantity"),
+    price: formData.get("price"),
+    fee: formData.get("fee") || 0,
+    tax: formData.get("tax") || 0,
+    currency: formData.get("currency"),
+    date: formData.get("date"),
+  });
+
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Ungültige Eingabe." };
+  }
+
+  const existing = await prisma.holding.findFirst({ where: { id, userId } });
+  if (!existing) {
+    return { error: "Transaktion wurde nicht gefunden." };
+  }
+
+  await prisma.holding.update({
+    where: { id },
+    data: parsed.data,
+  });
+
+  revalidatePath("/dashboard");
+  return {};
+}
+
+export async function deleteTransactionAction(id: string): Promise<void> {
+  const userId = await requireUserId();
+  await prisma.holding.deleteMany({ where: { id, userId } });
   revalidatePath("/dashboard");
 }

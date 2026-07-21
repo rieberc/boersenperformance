@@ -1,5 +1,11 @@
 import YahooFinance from "yahoo-finance2";
-import type { PriceProvider, PriceQuote, SecurityAssetType, SecuritySearchResult } from "@/lib/prices/provider";
+import type {
+  HistoricalPricePoint,
+  PriceProvider,
+  PriceQuote,
+  SecurityAssetType,
+  SecuritySearchResult,
+} from "@/lib/prices/provider";
 
 const yahooFinance = new YahooFinance({ queue: { concurrency: 4, interval: 250 } });
 
@@ -82,6 +88,22 @@ export const yahooPriceProvider: PriceProvider = {
       return quote.regularMarketPrice ?? null;
     } catch {
       return null;
+    }
+  },
+
+  async historicalPrices(symbol, start, end) {
+    try {
+      const result = await yahooFinance.chart(symbol, { period1: start, period2: end, interval: "1d" });
+      const out: HistoricalPricePoint[] = [];
+
+      for (const quote of result.quotes) {
+        const price = quote.close ?? quote.adjclose;
+        if (price == null) continue;
+        out.push({ date: quote.date.toISOString().slice(0, 10), price });
+      }
+      return out;
+    } catch {
+      return [];
     }
   },
 };

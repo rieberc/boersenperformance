@@ -22,7 +22,7 @@ export function SellForm({
   useEffect(() => {
     if (state === undefined) return;
     if (!state.error) {
-      queryClient.invalidateQueries({ queryKey: ["portfolio-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["portfolio"] });
       onDone();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

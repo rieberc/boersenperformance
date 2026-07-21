@@ -1,7 +1,11 @@
 export function formatEUR(value: number) {
+  return formatCurrency(value, "EUR");
+}
+
+export function formatCurrency(value: number, currency: string) {
   return value.toLocaleString("de-DE", {
     style: "currency",
-    currency: "EUR",
+    currency,
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });

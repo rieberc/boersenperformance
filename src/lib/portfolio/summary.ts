@@ -29,6 +29,7 @@ export type PortfolioSummary = {
   totalGain: number;
   totalGainPercent: number;
   totalRealizedGain: number;
+  earliestTransactionDate: string | null;
   holdings: HoldingSummary[];
 };
 
@@ -39,6 +40,7 @@ const EMPTY_SUMMARY: PortfolioSummary = {
   totalGain: 0,
   totalGainPercent: 0,
   totalRealizedGain: 0,
+  earliestTransactionDate: null,
   holdings: [],
 };
 
@@ -64,6 +66,8 @@ function aggregatePositions(
   const bySymbol = new Map<string, Position>();
 
   for (const t of transactions) {
+    if (t.type === "DIVIDEND") continue;
+
     const fxRate = fxRates.get(t.currency) ?? 1;
     const quantity = toNumber(t.quantity);
     const price = toNumber(t.price);
@@ -178,6 +182,7 @@ export async function getPortfolioSummary(userId: string): Promise<PortfolioSumm
     totalGain,
     totalGainPercent,
     totalRealizedGain,
+    earliestTransactionDate: transactions[0].date.toISOString(),
     holdings: rows,
   };
 }
