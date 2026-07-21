@@ -9,7 +9,7 @@ export function AllocationDonut({
   holdings,
   totalValue,
 }: {
-  holdings: Array<{ id: string; name: string; currentValue: number }>;
+  holdings: Array<{ symbol: string; name: string; currentValue: number }>;
   totalValue: number;
 }) {
   const data = holdings

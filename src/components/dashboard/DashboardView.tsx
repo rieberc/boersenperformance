@@ -76,6 +76,7 @@ export function DashboardView({ initialSummary }: { initialSummary: PortfolioSum
             totalInvested={summary.totalInvested}
             totalGain={summary.totalGain}
             totalGainPercent={summary.totalGainPercent}
+            totalRealizedGain={summary.totalRealizedGain}
           />
         </Card>
 

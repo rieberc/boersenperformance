@@ -51,8 +51,8 @@ export function HoldingForm({
 
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="mb-1.5 block text-sm font-medium text-navy">Kaufpreis</label>
-          <Input name="buyPrice" type="number" step="any" min="0" inputMode="decimal" required />
+          <label className="mb-1.5 block text-sm font-medium text-navy">Kaufpreis pro Stück</label>
+          <Input name="price" type="number" step="any" min="0" inputMode="decimal" required />
         </div>
         <div>
           <label className="mb-1.5 block text-sm font-medium text-navy">Währung</label>
@@ -62,7 +62,7 @@ export function HoldingForm({
 
       <div>
         <label className="mb-1.5 block text-sm font-medium text-navy">Kaufdatum</label>
-        <Input name="buyDate" type="date" defaultValue={today} max={today} required />
+        <Input name="date" type="date" defaultValue={today} max={today} required />
       </div>
 
       {state?.error && (

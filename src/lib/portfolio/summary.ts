@@ -6,14 +6,12 @@ import type { AssetType } from "@/generated/prisma/client";
 export const DISPLAY_CURRENCY = "EUR";
 
 export type HoldingSummary = {
-  id: string;
-  assetType: AssetType;
   symbol: string;
+  assetType: AssetType;
   name: string;
   currency: string;
   quantity: number;
-  buyPrice: number;
-  buyDate: string;
+  avgPrice: number;
   currentPrice: number | null;
   currentValue: number;
   investedValue: number;
@@ -30,23 +28,92 @@ export type PortfolioSummary = {
   totalInvested: number;
   totalGain: number;
   totalGainPercent: number;
+  totalRealizedGain: number;
   holdings: HoldingSummary[];
 };
 
-export async function getPortfolioSummary(userId: string): Promise<PortfolioSummary> {
-  const holdings = await prisma.holding.findMany({
-    where: { userId },
-    orderBy: { createdAt: "asc" },
-  });
+const EMPTY_SUMMARY: PortfolioSummary = {
+  currency: DISPLAY_CURRENCY,
+  totalValue: 0,
+  totalInvested: 0,
+  totalGain: 0,
+  totalGainPercent: 0,
+  totalRealizedGain: 0,
+  holdings: [],
+};
 
-  if (holdings.length === 0) {
-    return { currency: DISPLAY_CURRENCY, totalValue: 0, totalInvested: 0, totalGain: 0, totalGainPercent: 0, holdings: [] };
+type Position = {
+  assetType: AssetType;
+  symbol: string;
+  name: string;
+  currency: string;
+  quantity: number;
+  costBasis: number;
+  realizedGain: number;
+};
+
+/**
+ * Aggregates BUY/SELL transactions per symbol using the average-cost method:
+ * each SELL removes cost basis proportionally to the average cost per unit
+ * at that point, and the difference to the sale proceeds becomes realized gain.
+ */
+function aggregatePositions(
+  transactions: Awaited<ReturnType<typeof fetchTransactions>>,
+  fxRates: Map<string, number>,
+): Position[] {
+  const bySymbol = new Map<string, Position>();
+
+  for (const t of transactions) {
+    const fxRate = fxRates.get(t.currency) ?? 1;
+    const quantity = toNumber(t.quantity);
+    const price = toNumber(t.price);
+    const amountEUR = quantity * price * fxRate;
+
+    let position = bySymbol.get(t.symbol);
+    if (!position) {
+      position = {
+        assetType: t.assetType,
+        symbol: t.symbol,
+        name: t.name,
+        currency: t.currency,
+        quantity: 0,
+        costBasis: 0,
+        realizedGain: 0,
+      };
+      bySymbol.set(t.symbol, position);
+    }
+
+    if (t.type === "SELL") {
+      const avgCostPerUnit = position.quantity > 0 ? position.costBasis / position.quantity : 0;
+      const soldQuantity = Math.min(quantity, position.quantity);
+      const costRemoved = avgCostPerUnit * soldQuantity;
+
+      position.costBasis -= costRemoved;
+      position.quantity -= soldQuantity;
+      position.realizedGain += amountEUR - costRemoved;
+    } else {
+      position.quantity += quantity;
+      position.costBasis += amountEUR;
+      position.name = t.name;
+      position.currency = t.currency;
+    }
   }
 
-  const symbols = holdings.map((h) => h.symbol);
-  const quotes = await getQuotesWithCache(symbols);
+  return [...bySymbol.values()];
+}
 
-  const currencies = [...new Set(holdings.map((h) => h.currency))];
+async function fetchTransactions(userId: string) {
+  return prisma.holding.findMany({
+    where: { userId },
+    orderBy: { date: "asc" },
+  });
+}
+
+export async function getPortfolioSummary(userId: string): Promise<PortfolioSummary> {
+  const transactions = await fetchTransactions(userId);
+  if (transactions.length === 0) return EMPTY_SUMMARY;
+
+  const currencies = [...new Set(transactions.map((t) => t.currency))];
   const fxRates = new Map<string, number>();
   await Promise.all(
     currencies.map(async (currency) => {
@@ -55,18 +122,24 @@ export async function getPortfolioSummary(userId: string): Promise<PortfolioSumm
     }),
   );
 
+  const positions = aggregatePositions(transactions, fxRates);
+  const openPositions = positions.filter((p) => p.quantity > 1e-9);
+
+  const symbols = openPositions.map((p) => p.symbol);
+  const quotes = await getQuotesWithCache(symbols);
+
   let totalValue = 0;
   let totalInvested = 0;
+  const totalRealizedGain = positions.reduce((sum, p) => sum + p.realizedGain, 0);
 
-  const rows = holdings.map((h) => {
-    const quantity = toNumber(h.quantity);
-    const buyPrice = toNumber(h.buyPrice);
-    const quote = quotes.get(h.symbol);
-    const fxRate = fxRates.get(h.currency) ?? 1;
+  const rows: HoldingSummary[] = openPositions.map((p) => {
+    const quote = quotes.get(p.symbol);
+    const fxRate = fxRates.get(p.currency) ?? 1;
+    const avgPrice = p.costBasis / p.quantity / fxRate;
 
     const currentPrice = quote?.price ?? null;
-    const currentValue = (currentPrice ?? buyPrice) * quantity * fxRate;
-    const investedValue = buyPrice * quantity * fxRate;
+    const currentValue = currentPrice != null ? currentPrice * p.quantity * fxRate : p.costBasis;
+    const investedValue = p.costBasis;
     const gain = currentValue - investedValue;
     const gainPercent = investedValue > 0 ? (gain / investedValue) * 100 : 0;
 
@@ -74,14 +147,12 @@ export async function getPortfolioSummary(userId: string): Promise<PortfolioSumm
     totalInvested += investedValue;
 
     return {
-      id: h.id,
-      assetType: h.assetType,
-      symbol: h.symbol,
-      name: h.name,
-      currency: h.currency,
-      quantity,
-      buyPrice,
-      buyDate: h.buyDate.toISOString(),
+      symbol: p.symbol,
+      assetType: p.assetType,
+      name: p.name,
+      currency: p.currency,
+      quantity: p.quantity,
+      avgPrice,
       currentPrice,
       currentValue,
       investedValue,
@@ -106,6 +177,7 @@ export async function getPortfolioSummary(userId: string): Promise<PortfolioSumm
     totalInvested,
     totalGain,
     totalGainPercent,
+    totalRealizedGain,
     holdings: rows,
   };
 }

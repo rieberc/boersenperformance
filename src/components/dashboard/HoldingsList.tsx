@@ -16,7 +16,7 @@ export function HoldingsList({ holdings }: { holdings: HoldingSummary[] }) {
   return (
     <div className="divide-y divide-border">
       {holdings.map((holding) => (
-        <HoldingRow key={holding.id} holding={holding} />
+        <HoldingRow key={holding.symbol} holding={holding} />
       ))}
     </div>
   );
