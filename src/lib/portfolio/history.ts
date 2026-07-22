@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { yahooPriceProvider } from "@/lib/prices/yahoo";
-import { getFxRateWithCache } from "@/lib/prices/cache";
+import { getFxRateWithCache, getQuotesWithCache } from "@/lib/prices/cache";
 import { toNumber } from "@/lib/utils/decimal";
 import { DISPLAY_CURRENCY } from "@/lib/portfolio/summary";
 
@@ -8,6 +8,36 @@ export type ValuePoint = { date: string; value: number };
 
 function toIsoDate(d: Date): string {
   return d.toISOString().slice(0, 10);
+}
+
+/**
+ * The unofficial Yahoo Finance API occasionally returns a single bad tick
+ * (a price wildly out of line with the days around it). An isolated spike
+ * or drop that reverts on the very next data point is almost certainly bad
+ * data rather than a real move, so it's smoothed out before it can distort
+ * the reconstructed portfolio value.
+ */
+function removePriceOutliers(
+  points: { date: string; price: number }[],
+): { date: string; price: number }[] {
+  if (points.length < 3) return points;
+
+  const cleaned = points.map((p) => ({ ...p }));
+  for (let i = 1; i < cleaned.length - 1; i++) {
+    const prev = cleaned[i - 1].price;
+    const curr = cleaned[i].price;
+    const next = cleaned[i + 1].price;
+    if (prev <= 0 || next <= 0) continue;
+
+    const jumpFromPrev = Math.abs(curr / prev - 1);
+    const jumpToNext = Math.abs(curr / next - 1);
+    const neighborsAgree = Math.abs(prev / next - 1) < 0.15;
+
+    if (jumpFromPrev > 0.4 && jumpToNext > 0.4 && neighborsAgree) {
+      cleaned[i].price = (prev + next) / 2;
+    }
+  }
+  return cleaned;
 }
 
 function buildDateAxis(start: Date, end: Date): string[] {
@@ -50,9 +80,24 @@ export async function getValueHistory(userId: string, start: Date, end: Date): P
   const priceSeriesBySymbol = new Map<string, { date: string; price: number }[]>();
   await Promise.all(
     symbols.map(async (symbol) => {
-      priceSeriesBySymbol.set(symbol, await yahooPriceProvider.historicalPrices(symbol, start, end));
+      const points = await yahooPriceProvider.historicalPrices(symbol, start, end);
+      priceSeriesBySymbol.set(symbol, removePriceOutliers(points));
     }),
   );
+
+  // If a symbol's historical fetch failed outright (e.g. a transient Yahoo
+  // API error), fall back to its last cached current price rather than
+  // silently contributing 0 for the whole range.
+  const missingSymbols = symbols.filter((s) => priceSeriesBySymbol.get(s)!.length === 0);
+  if (missingSymbols.length > 0) {
+    const fallbackQuotes = await getQuotesWithCache(missingSymbols);
+    for (const symbol of missingSymbols) {
+      const fallback = fallbackQuotes.get(symbol);
+      if (fallback) {
+        priceSeriesBySymbol.set(symbol, [{ date: toIsoDate(start), price: fallback.price }]);
+      }
+    }
+  }
 
   const currencies = [...new Set(symbolCurrency.values())];
   const fxRates = new Map<string, number>();
