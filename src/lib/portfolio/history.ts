@@ -3,6 +3,7 @@ import { yahooPriceProvider } from "@/lib/prices/yahoo";
 import { getFxRateWithCache, getQuotesWithCache } from "@/lib/prices/cache";
 import { toNumber } from "@/lib/utils/decimal";
 import { DISPLAY_CURRENCY } from "@/lib/portfolio/summary";
+import type { AssetType } from "@/generated/prisma/client";
 
 export type ValuePoint = { date: string; value: number; contributed: number };
 
@@ -64,9 +65,19 @@ function buildDateAxis(start: Date, end: Date): string[] {
  * net cash contributed (buys add, sells subtract, in the currency actually
  * paid) — so the caller can chart market performance against money put in.
  */
-export async function getValueHistory(userId: string, start: Date, end: Date): Promise<ValuePoint[]> {
+export async function getValueHistory(
+  userId: string,
+  start: Date,
+  end: Date,
+  assetTypes?: AssetType[],
+): Promise<ValuePoint[]> {
   const transactions = await prisma.holding.findMany({
-    where: { userId, type: { not: "DIVIDEND" }, date: { lte: end } },
+    where: {
+      userId,
+      type: { not: "DIVIDEND" },
+      date: { lte: end },
+      ...(assetTypes ? { assetType: { in: assetTypes } } : {}),
+    },
     orderBy: { date: "asc" },
   });
 

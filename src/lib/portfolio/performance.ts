@@ -4,6 +4,7 @@ import { getFxRateWithCache } from "@/lib/prices/cache";
 import { toNumber } from "@/lib/utils/decimal";
 import { DISPLAY_CURRENCY, getPortfolioSummary } from "@/lib/portfolio/summary";
 import { getValueHistory } from "@/lib/portfolio/history";
+import type { AssetType } from "@/generated/prisma/client";
 
 export type PerformanceOverview = {
   totalValue: number;
@@ -57,11 +58,16 @@ export async function getPerformanceOverview(
   userId: string,
   start: Date,
   end: Date,
+  assetTypes?: AssetType[],
 ): Promise<PerformanceOverview> {
-  const summary = await getPortfolioSummary(userId);
+  const summary = await getPortfolioSummary(userId, assetTypes);
 
   const periodTransactions = await prisma.holding.findMany({
-    where: { userId, date: { gte: start, lte: end } },
+    where: {
+      userId,
+      date: { gte: start, lte: end },
+      ...(assetTypes ? { assetType: { in: assetTypes } } : {}),
+    },
     orderBy: { date: "asc" },
   });
 
@@ -99,7 +105,7 @@ export async function getPerformanceOverview(
     }
   }
 
-  const series = await getValueHistory(userId, start, end);
+  const series = await getValueHistory(userId, start, end, assetTypes);
   const ttwror = computeTTWROR(series, cashFlowByDate);
 
   // Only add a virtual "bought everything I already held" outflow at the
@@ -107,7 +113,9 @@ export async function getPerformanceOverview(
   // otherwise (e.g. the default "seit Kauf" period, which starts exactly on
   // the first transaction) that transaction is already in izfCashFlows and
   // adding series[0].value again would double-count the initial investment.
-  const priorPositionCount = await prisma.holding.count({ where: { userId, date: { lt: start } } });
+  const priorPositionCount = await prisma.holding.count({
+    where: { userId, date: { lt: start }, ...(assetTypes ? { assetType: { in: assetTypes } } : {}) },
+  });
   const startValue = series[0]?.value ?? 0;
   if (priorPositionCount > 0 && startValue > 1e-9) {
     izfCashFlows.unshift({ amount: -startValue, when: start });

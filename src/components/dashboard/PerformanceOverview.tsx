@@ -40,11 +40,14 @@ function Row({
   );
 }
 
-export function PerformanceOverview({ start, end }: { start: string; end: string }) {
+export function PerformanceOverview({ start, end, types }: { start: string; end: string; types?: string }) {
   const { data, isFetching } = useQuery({
-    queryKey: ["portfolio", "performance", start, end],
+    queryKey: ["portfolio", "performance", start, end, types ?? null],
     queryFn: async (): Promise<PerformanceOverviewData> => {
-      const res = await fetch(`/api/portfolio/performance?start=${start}&end=${end}`);
+      const url = types
+        ? `/api/portfolio/performance?start=${start}&end=${end}&types=${types}`
+        : `/api/portfolio/performance?start=${start}&end=${end}`;
+      const res = await fetch(url);
       if (!res.ok) throw new Error("Laden fehlgeschlagen");
       return res.json();
     },

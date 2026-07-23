@@ -5,11 +5,23 @@ import { Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } f
 import { formatEUR } from "@/lib/utils/currency";
 import type { ValuePoint } from "@/lib/portfolio/history";
 
-export function PerformanceChart({ start, end }: { start: string; end: string }) {
+function formatCompactEUR(value: number) {
+  return value.toLocaleString("de-DE", {
+    style: "currency",
+    currency: "EUR",
+    notation: "compact",
+    maximumFractionDigits: 1,
+  });
+}
+
+export function PerformanceChart({ start, end, types }: { start: string; end: string; types?: string }) {
   const { data, isFetching } = useQuery({
-    queryKey: ["portfolio", "history", start, end],
+    queryKey: ["portfolio", "history", start, end, types ?? null],
     queryFn: async (): Promise<{ series: ValuePoint[] }> => {
-      const res = await fetch(`/api/portfolio/history?start=${start}&end=${end}`);
+      const url = types
+        ? `/api/portfolio/history?start=${start}&end=${end}&types=${types}`
+        : `/api/portfolio/history?start=${start}&end=${end}`;
+      const res = await fetch(url);
       if (!res.ok) throw new Error("Laden fehlgeschlagen");
       return res.json();
     },
@@ -42,8 +54,9 @@ export function PerformanceChart({ start, end }: { start: string; end: string })
             tickLine={false}
           />
           <YAxis
-            width={0}
-            tick={false}
+            width={56}
+            tick={{ fontSize: 11, fill: "#6b7684" }}
+            tickFormatter={(v: number) => formatCompactEUR(v)}
             axisLine={false}
             tickLine={false}
             domain={["dataMin", "dataMax"]}

@@ -26,7 +26,7 @@ export default async function ActivityPage() {
       </header>
 
       <main className="px-5">
-        <ActivityList transactions={transactions} />
+        <ActivityList initialTransactions={transactions} />
       </main>
     </div>
   );

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { getPerformanceOverview } from "@/lib/portfolio/performance";
+import { parseAssetTypesParam } from "@/lib/utils/assetTypeFilter";
 
 export async function GET(request: NextRequest) {
   const session = await auth();
@@ -20,6 +21,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Ungültiger Zeitraum." }, { status: 400 });
   }
 
-  const overview = await getPerformanceOverview(session.user.id, start, end);
+  const assetTypes = parseAssetTypesParam(request.nextUrl.searchParams.get("types"));
+
+  const overview = await getPerformanceOverview(session.user.id, start, end, assetTypes);
   return NextResponse.json(overview);
 }

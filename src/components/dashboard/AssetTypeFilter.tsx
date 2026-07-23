@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { clsx } from "clsx";
+import type { AssetType } from "@/generated/prisma/client";
 
 export type AssetGroup = "securities" | "crypto";
 
@@ -11,6 +12,21 @@ const GROUP_LABELS: Record<AssetGroup, string> = {
   securities: "Wertpapiere",
   crypto: "Kryptowährungen",
 };
+
+const GROUP_ASSET_TYPES: Record<AssetGroup, AssetType[]> = {
+  securities: ["STOCK", "ETF"],
+  crypto: ["CRYPTO"],
+};
+
+/** Undefined means "no filter" — either nothing or everything is selected. */
+export function assetGroupsToTypesParam(groups: Set<AssetGroup>): string | undefined {
+  if (groups.size === 0 || groups.size === ALL_ASSET_GROUPS.length) return undefined;
+  return [...groups].flatMap((g) => GROUP_ASSET_TYPES[g]).join(",");
+}
+
+export function toAssetGroup(assetType: AssetType): AssetGroup {
+  return assetType === "CRYPTO" ? "crypto" : "securities";
+}
 
 export function AssetTypeFilter({
   selected,
