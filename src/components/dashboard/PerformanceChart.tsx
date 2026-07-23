@@ -1,15 +1,27 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { formatEUR } from "@/lib/utils/currency";
 import type { ValuePoint } from "@/lib/portfolio/history";
 
-export function PerformanceChart({ start, end }: { start: string; end: string }) {
+function formatCompactEUR(value: number) {
+  return value.toLocaleString("de-DE", {
+    style: "currency",
+    currency: "EUR",
+    notation: "compact",
+    maximumFractionDigits: 1,
+  });
+}
+
+export function PerformanceChart({ start, end, types }: { start: string; end: string; types?: string }) {
   const { data, isFetching } = useQuery({
-    queryKey: ["portfolio", "history", start, end],
+    queryKey: ["portfolio", "history", start, end, types ?? null],
     queryFn: async (): Promise<{ series: ValuePoint[] }> => {
-      const res = await fetch(`/api/portfolio/history?start=${start}&end=${end}`);
+      const url = types
+        ? `/api/portfolio/history?start=${start}&end=${end}&types=${types}`
+        : `/api/portfolio/history?start=${start}&end=${end}`;
+      const res = await fetch(url);
       if (!res.ok) throw new Error("Laden fehlgeschlagen");
       return res.json();
     },
@@ -30,7 +42,7 @@ export function PerformanceChart({ start, end }: { start: string; end: string })
   }
 
   return (
-    <div className="h-56">
+    <div className="h-64">
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={series} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
           <XAxis
@@ -42,17 +54,37 @@ export function PerformanceChart({ start, end }: { start: string; end: string })
             tickLine={false}
           />
           <YAxis
-            width={0}
-            tick={false}
+            width={56}
+            tick={{ fontSize: 11, fill: "#6b7684" }}
+            tickFormatter={(v: number) => formatCompactEUR(v)}
             axisLine={false}
             tickLine={false}
             domain={["dataMin", "dataMax"]}
           />
           <Tooltip
-            formatter={(value) => [formatEUR(Number(value)), "Wert"]}
+            formatter={(value, name) => [formatEUR(Number(value)), name]}
             labelFormatter={(label) => new Date(String(label)).toLocaleDateString("de-DE")}
           />
-          <Line type="monotone" dataKey="value" stroke="#0ea780" strokeWidth={2} dot={false} />
+          <Legend
+            wrapperStyle={{ fontSize: 12 }}
+            formatter={(value) => <span className="text-muted">{value}</span>}
+          />
+          <Line
+            type="monotone"
+            dataKey="value"
+            name="Portfoliowert"
+            stroke="#0ea780"
+            strokeWidth={2}
+            dot={false}
+          />
+          <Line
+            type="monotone"
+            dataKey="contributed"
+            name="Zugeführtes Kapital"
+            stroke="#8aa4bd"
+            strokeWidth={1.5}
+            dot={false}
+          />
         </LineChart>
       </ResponsiveContainer>
     </div>

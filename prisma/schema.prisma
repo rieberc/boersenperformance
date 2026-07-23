@@ -20,12 +20,13 @@ enum TransactionType {
 }
 
 model User {
-  id           String    @id @default(cuid())
-  email        String    @unique
-  passwordHash String
-  name         String?
-  createdAt    DateTime  @default(now())
-  holdings     Holding[]
+  id             String          @id @default(cuid())
+  email          String          @unique
+  passwordHash   String
+  name           String?
+  createdAt      DateTime        @default(now())
+  holdings       Holding[]
+  watchlistItems WatchlistItem[]
 }
 
 model Holding {
@@ -46,6 +47,20 @@ model Holding {
 
   @@index([userId])
   @@index([userId, symbol])
+}
+
+model WatchlistItem {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assetType AssetType
+  symbol    String
+  name      String
+  currency  String
+  createdAt DateTime  @default(now())
+
+  @@unique([userId, symbol])
+  @@index([userId])
 }
 
 model PriceCache {
