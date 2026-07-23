@@ -19,9 +19,14 @@ export type HistoricalPricePoint = {
   price: number;
 };
 
+export type HistoricalPriceSeries = {
+  currency: string;
+  points: HistoricalPricePoint[];
+};
+
 export interface PriceProvider {
   search(query: string): Promise<SecuritySearchResult[]>;
   quotes(symbols: string[]): Promise<PriceQuote[]>;
   fxRate(from: string, to: string): Promise<number | null>;
-  historicalPrices(symbol: string, start: Date, end: Date): Promise<HistoricalPricePoint[]>;
+  historicalPrices(symbol: string, start: Date, end: Date): Promise<HistoricalPriceSeries>;
 }

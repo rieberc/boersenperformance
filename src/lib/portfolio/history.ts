@@ -54,8 +54,11 @@ function buildDateAxis(start: Date, end: Date): string[] {
 /**
  * Reconstructs daily portfolio value between start and end by forward-filling
  * each symbol's last known historical price and cumulative held quantity
- * (BUY/SELL transactions only — dividends don't affect quantity). Uses the
- * current FX rate uniformly, consistent with the rest of the app.
+ * (BUY/SELL transactions only — dividends don't affect quantity). Prices are
+ * converted using the currency the quote itself is denominated in (which can
+ * differ from the currency the user recorded the purchase in, e.g. an
+ * LSE-listed ETF bought via a EUR-settling broker), using the current FX
+ * rate uniformly for the whole series — consistent with the rest of the app.
  */
 export async function getValueHistory(userId: string, start: Date, end: Date): Promise<ValuePoint[]> {
   const transactions = await prisma.holding.findMany({
@@ -65,23 +68,22 @@ export async function getValueHistory(userId: string, start: Date, end: Date): P
 
   if (transactions.length === 0) return [];
 
-  const symbolCurrency = new Map<string, string>();
   const deltasBySymbol = new Map<string, { date: string; delta: number }[]>();
-
   for (const t of transactions) {
-    symbolCurrency.set(t.symbol, t.currency);
     const list = deltasBySymbol.get(t.symbol) ?? [];
     const qty = toNumber(t.quantity);
     list.push({ date: toIsoDate(t.date), delta: t.type === "SELL" ? -qty : qty });
     deltasBySymbol.set(t.symbol, list);
   }
 
-  const symbols = [...symbolCurrency.keys()];
+  const symbols = [...deltasBySymbol.keys()];
   const priceSeriesBySymbol = new Map<string, { date: string; price: number }[]>();
+  const priceCurrencyBySymbol = new Map<string, string>();
   await Promise.all(
     symbols.map(async (symbol) => {
-      const points = await yahooPriceProvider.historicalPrices(symbol, start, end);
+      const { currency, points } = await yahooPriceProvider.historicalPrices(symbol, start, end);
       priceSeriesBySymbol.set(symbol, removePriceOutliers(points));
+      priceCurrencyBySymbol.set(symbol, currency);
     }),
   );
 
@@ -95,14 +97,15 @@ export async function getValueHistory(userId: string, start: Date, end: Date): P
       const fallback = fallbackQuotes.get(symbol);
       if (fallback) {
         priceSeriesBySymbol.set(symbol, [{ date: toIsoDate(start), price: fallback.price }]);
+        priceCurrencyBySymbol.set(symbol, fallback.currency);
       }
     }
   }
 
-  const currencies = [...new Set(symbolCurrency.values())];
+  const currencies = new Set(priceCurrencyBySymbol.values());
   const fxRates = new Map<string, number>();
   await Promise.all(
-    currencies.map(async (currency) => {
+    [...currencies].map(async (currency) => {
       fxRates.set(currency, (await getFxRateWithCache(currency, DISPLAY_CURRENCY)) ?? 1);
     }),
   );
@@ -143,7 +146,7 @@ export async function getValueHistory(userId: string, start: Date, end: Date): P
 
       if (price === 0) continue;
 
-      const fxRate = fxRates.get(symbolCurrency.get(symbol)!) ?? 1;
+      const fxRate = fxRates.get(priceCurrencyBySymbol.get(symbol) ?? DISPLAY_CURRENCY) ?? 1;
       total += qty * price * fxRate;
     }
 

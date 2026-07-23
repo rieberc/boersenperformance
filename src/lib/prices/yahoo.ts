@@ -1,6 +1,6 @@
 import YahooFinance from "yahoo-finance2";
 import type {
-  HistoricalPricePoint,
+  HistoricalPriceSeries,
   PriceProvider,
   PriceQuote,
   SecurityAssetType,
@@ -14,6 +14,23 @@ const QUOTE_TYPE_TO_ASSET_TYPE: Record<string, SecurityAssetType> = {
   ETF: "ETF",
   CRYPTOCURRENCY: "CRYPTO",
 };
+
+// Some exchanges (notably LSE) quote in a minor unit rather than the major
+// currency — e.g. IGSG.L trades in GBp (pence), 1/100 of GBP. Left
+// unnormalized, this silently inflates value calculations ~100x once
+// converted as if it were already the major currency.
+const MINOR_UNIT_CURRENCIES: Record<string, { major: string; divisor: number }> = {
+  GBp: { major: "GBP", divisor: 100 },
+  GBX: { major: "GBP", divisor: 100 },
+  ZAc: { major: "ZAR", divisor: 100 },
+  ILA: { major: "ILS", divisor: 100 },
+};
+
+function normalizeCurrency(currency: string, price: number): { currency: string; price: number } {
+  const minorUnit = MINOR_UNIT_CURRENCIES[currency];
+  if (!minorUnit) return { currency, price };
+  return { currency: minorUnit.major, price: price / minorUnit.divisor };
+}
 
 export const yahooPriceProvider: PriceProvider = {
   async search(query) {
@@ -44,7 +61,9 @@ export const yahooPriceProvider: PriceProvider = {
             out.map((r) => r.symbol),
             { fields: ["symbol", "currency"] },
           );
-          const currencyBySymbol = new Map(quotes.map((q) => [q.symbol, q.currency]));
+          const currencyBySymbol = new Map(
+            quotes.map((q) => [q.symbol, q.currency ? (MINOR_UNIT_CURRENCIES[q.currency]?.major ?? q.currency) : undefined]),
+          );
           for (const item of out) {
             item.currency = currencyBySymbol.get(item.symbol) ?? undefined;
           }
@@ -70,9 +89,10 @@ export const yahooPriceProvider: PriceProvider = {
 
       const out: PriceQuote[] = [];
       for (const r of results) {
-        const price = r.regularMarketPrice ?? r.postMarketPrice ?? r.regularMarketPreviousClose;
-        if (price == null) continue;
-        out.push({ symbol: r.symbol, price, currency: r.currency ?? "USD" });
+        const rawPrice = r.regularMarketPrice ?? r.postMarketPrice ?? r.regularMarketPreviousClose;
+        if (rawPrice == null) continue;
+        const { currency, price } = normalizeCurrency(r.currency ?? "USD", rawPrice);
+        out.push({ symbol: r.symbol, price, currency });
       }
       return out;
     } catch {
@@ -94,16 +114,20 @@ export const yahooPriceProvider: PriceProvider = {
   async historicalPrices(symbol, start, end) {
     try {
       const result = await yahooFinance.chart(symbol, { period1: start, period2: end, interval: "1d" });
-      const out: HistoricalPricePoint[] = [];
+      const rawCurrency = result.meta.currency;
+      const minorUnit = MINOR_UNIT_CURRENCIES[rawCurrency];
+      const currency = minorUnit?.major ?? rawCurrency;
 
+      const points: HistoricalPriceSeries["points"] = [];
       for (const quote of result.quotes) {
-        const price = quote.close ?? quote.adjclose;
-        if (price == null) continue;
-        out.push({ date: quote.date.toISOString().slice(0, 10), price });
+        const rawPrice = quote.close ?? quote.adjclose;
+        if (rawPrice == null) continue;
+        const price = minorUnit ? rawPrice / minorUnit.divisor : rawPrice;
+        points.push({ date: quote.date.toISOString().slice(0, 10), price });
       }
-      return out;
+      return { currency, points };
     } catch {
-      return [];
+      return { currency: "EUR", points: [] };
     }
   },
 };

@@ -117,10 +117,19 @@ export async function getPortfolioSummary(userId: string): Promise<PortfolioSumm
   const transactions = await fetchTransactions(userId);
   if (transactions.length === 0) return EMPTY_SUMMARY;
 
-  const currencies = [...new Set(transactions.map((t) => t.currency))];
+  // Note: a holding's cost-basis currency (what was actually paid, e.g. EUR
+  // via a German broker) can differ from the currency the live quote is
+  // denominated in (e.g. GBP for an LSE-listed ETF) — each needs its own FX
+  // rate, so quotes are fetched first to know every currency involved.
+  const symbolsForQuotes = [...new Set(transactions.filter((t) => t.type !== "DIVIDEND").map((t) => t.symbol))];
+  const quotes = await getQuotesWithCache(symbolsForQuotes);
+
+  const currencies = new Set(transactions.map((t) => t.currency));
+  for (const quote of quotes.values()) currencies.add(quote.currency);
+
   const fxRates = new Map<string, number>();
   await Promise.all(
-    currencies.map(async (currency) => {
+    [...currencies].map(async (currency) => {
       const rate = await getFxRateWithCache(currency, DISPLAY_CURRENCY);
       fxRates.set(currency, rate ?? 1);
     }),
@@ -128,9 +137,6 @@ export async function getPortfolioSummary(userId: string): Promise<PortfolioSumm
 
   const positions = aggregatePositions(transactions, fxRates);
   const openPositions = positions.filter((p) => p.quantity > 1e-9);
-
-  const symbols = openPositions.map((p) => p.symbol);
-  const quotes = await getQuotesWithCache(symbols);
 
   let totalValue = 0;
   let totalInvested = 0;
@@ -142,7 +148,8 @@ export async function getPortfolioSummary(userId: string): Promise<PortfolioSumm
     const avgPrice = p.costBasis / p.quantity / fxRate;
 
     const currentPrice = quote?.price ?? null;
-    const currentValue = currentPrice != null ? currentPrice * p.quantity * fxRate : p.costBasis;
+    const currentFxRate = quote ? (fxRates.get(quote.currency) ?? 1) : fxRate;
+    const currentValue = currentPrice != null ? currentPrice * p.quantity * currentFxRate : p.costBasis;
     const investedValue = p.costBasis;
     const gain = currentValue - investedValue;
     const gainPercent = investedValue > 0 ? (gain / investedValue) * 100 : 0;
