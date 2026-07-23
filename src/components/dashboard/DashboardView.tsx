@@ -15,11 +15,17 @@ import { ImportCsvSheet } from "@/components/import/ImportCsvSheet";
 import { DateRangePicker } from "@/components/dashboard/DateRangePicker";
 import { PerformanceChart } from "@/components/dashboard/PerformanceChart";
 import { PerformanceOverview } from "@/components/dashboard/PerformanceOverview";
+import { AssetTypeFilter, ALL_ASSET_GROUPS, type AssetGroup } from "@/components/dashboard/AssetTypeFilter";
 import { resolvePresetRange, type DateRangePreset } from "@/lib/utils/dateRange";
-import type { PortfolioSummary } from "@/lib/portfolio/summary";
+import type { HoldingSummary, PortfolioSummary } from "@/lib/portfolio/summary";
+import type { PerformanceOverview as PerformanceOverviewData } from "@/lib/portfolio/performance";
 
 function toIsoDate(d: Date): string {
   return d.toISOString().slice(0, 10);
+}
+
+function toAssetGroup(assetType: HoldingSummary["assetType"]): AssetGroup {
+  return assetType === "CRYPTO" ? "crypto" : "securities";
 }
 
 export function DashboardView({ initialSummary }: { initialSummary: PortfolioSummary }) {
@@ -29,6 +35,7 @@ export function DashboardView({ initialSummary }: { initialSummary: PortfolioSum
     start: toIsoDate(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)),
     end: toIsoDate(new Date()),
   }));
+  const [assetGroups, setAssetGroups] = useState<Set<AssetGroup>>(new Set(ALL_ASSET_GROUPS));
 
   const { data, isFetching, refetch } = useQuery({
     queryKey: ["portfolio", "summary"],
@@ -58,6 +65,31 @@ export function DashboardView({ initialSummary }: { initialSummary: PortfolioSum
       : resolvePresetRange(preset, earliestTransactionDate);
   const rangeStartIso = toIsoDate(range.start);
   const rangeEndIso = toIsoDate(range.end);
+
+  // Same queryKey/queryFn as PerformanceOverview so TanStack Query dedupes
+  // this into a single request when both are mounted.
+  const { data: performance } = useQuery({
+    queryKey: ["portfolio", "performance", rangeStartIso, rangeEndIso],
+    queryFn: async (): Promise<PerformanceOverviewData> => {
+      const res = await fetch(`/api/portfolio/performance?start=${rangeStartIso}&end=${rangeEndIso}`);
+      if (!res.ok) throw new Error("Laden fehlgeschlagen");
+      return res.json();
+    },
+  });
+
+  const isAssetFiltered = assetGroups.size < ALL_ASSET_GROUPS.length;
+  const filteredHoldings = isAssetFiltered
+    ? summary.holdings.filter((h) => assetGroups.has(toAssetGroup(h.assetType)))
+    : summary.holdings;
+
+  const filteredTotalValue = isAssetFiltered
+    ? filteredHoldings.reduce((sum, h) => sum + h.currentValue, 0)
+    : summary.totalValue;
+  const filteredTotalInvested = isAssetFiltered
+    ? filteredHoldings.reduce((sum, h) => sum + h.investedValue, 0)
+    : summary.totalInvested;
+  const filteredTotalGain = filteredTotalValue - filteredTotalInvested;
+  const filteredTotalGainPercent = filteredTotalInvested > 0 ? (filteredTotalGain / filteredTotalInvested) * 100 : 0;
 
   return (
     <div className="mx-auto min-h-dvh w-full max-w-lg bg-background pb-28">
@@ -106,18 +138,23 @@ export function DashboardView({ initialSummary }: { initialSummary: PortfolioSum
           </Card>
         )}
 
+        <div className="flex justify-end">
+          <AssetTypeFilter selected={assetGroups} onChange={setAssetGroups} />
+        </div>
+
         <Card className="p-5">
           <ValueHeader
-            totalValue={summary.totalValue}
-            totalInvested={summary.totalInvested}
-            totalGain={summary.totalGain}
-            totalGainPercent={summary.totalGainPercent}
-            totalRealizedGain={summary.totalRealizedGain}
+            totalValue={filteredTotalValue}
+            totalInvested={filteredTotalInvested}
+            totalGain={filteredTotalGain}
+            totalGainPercent={filteredTotalGainPercent}
+            totalRealizedGain={isAssetFiltered ? 0 : (performance?.realisiertBrutto ?? summary.totalRealizedGain)}
+            izf={isAssetFiltered ? null : performance?.izf}
           />
         </Card>
 
         <Card className="p-5">
-          <AllocationDonut holdings={summary.holdings} totalValue={summary.totalValue} />
+          <AllocationDonut holdings={filteredHoldings} totalValue={filteredTotalValue} />
         </Card>
 
         <Card className="p-5">
@@ -147,7 +184,7 @@ export function DashboardView({ initialSummary }: { initialSummary: PortfolioSum
             </Link>
           </div>
           <div className="px-3">
-            <HoldingsList holdings={summary.holdings} />
+            <HoldingsList holdings={filteredHoldings} />
           </div>
         </Card>
       </main>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { formatEUR } from "@/lib/utils/currency";
 import type { ValuePoint } from "@/lib/portfolio/history";
 
@@ -30,7 +30,7 @@ export function PerformanceChart({ start, end }: { start: string; end: string })
   }
 
   return (
-    <div className="h-56">
+    <div className="h-64">
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={series} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
           <XAxis
@@ -49,10 +49,29 @@ export function PerformanceChart({ start, end }: { start: string; end: string })
             domain={["dataMin", "dataMax"]}
           />
           <Tooltip
-            formatter={(value) => [formatEUR(Number(value)), "Wert"]}
+            formatter={(value, name) => [formatEUR(Number(value)), name]}
             labelFormatter={(label) => new Date(String(label)).toLocaleDateString("de-DE")}
           />
-          <Line type="monotone" dataKey="value" stroke="#0ea780" strokeWidth={2} dot={false} />
+          <Legend
+            wrapperStyle={{ fontSize: 12 }}
+            formatter={(value) => <span className="text-muted">{value}</span>}
+          />
+          <Line
+            type="monotone"
+            dataKey="value"
+            name="Portfoliowert"
+            stroke="#0ea780"
+            strokeWidth={2}
+            dot={false}
+          />
+          <Line
+            type="monotone"
+            dataKey="contributed"
+            name="Zugeführtes Kapital"
+            stroke="#8aa4bd"
+            strokeWidth={1.5}
+            dot={false}
+          />
         </LineChart>
       </ResponsiveContainer>
     </div>

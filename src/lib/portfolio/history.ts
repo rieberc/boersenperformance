@@ -4,7 +4,7 @@ import { getFxRateWithCache, getQuotesWithCache } from "@/lib/prices/cache";
 import { toNumber } from "@/lib/utils/decimal";
 import { DISPLAY_CURRENCY } from "@/lib/portfolio/summary";
 
-export type ValuePoint = { date: string; value: number };
+export type ValuePoint = { date: string; value: number; contributed: number };
 
 function toIsoDate(d: Date): string {
   return d.toISOString().slice(0, 10);
@@ -59,6 +59,10 @@ function buildDateAxis(start: Date, end: Date): string[] {
  * differ from the currency the user recorded the purchase in, e.g. an
  * LSE-listed ETF bought via a EUR-settling broker), using the current FX
  * rate uniformly for the whole series — consistent with the rest of the app.
+ *
+ * Alongside portfolio value, also tracks "zugeführtes Kapital" — the running
+ * net cash contributed (buys add, sells subtract, in the currency actually
+ * paid) — so the caller can chart market performance against money put in.
  */
 export async function getValueHistory(userId: string, start: Date, end: Date): Promise<ValuePoint[]> {
   const transactions = await prisma.holding.findMany({
@@ -69,6 +73,8 @@ export async function getValueHistory(userId: string, start: Date, end: Date): P
   if (transactions.length === 0) return [];
 
   const deltasBySymbol = new Map<string, { date: string; delta: number }[]>();
+  const contributionEvents: { date: string; delta: number }[] = [];
+
   for (const t of transactions) {
     const list = deltasBySymbol.get(t.symbol) ?? [];
     const qty = toNumber(t.quantity);
@@ -103,12 +109,20 @@ export async function getValueHistory(userId: string, start: Date, end: Date): P
   }
 
   const currencies = new Set(priceCurrencyBySymbol.values());
+  for (const t of transactions) currencies.add(t.currency);
   const fxRates = new Map<string, number>();
   await Promise.all(
     [...currencies].map(async (currency) => {
       fxRates.set(currency, (await getFxRateWithCache(currency, DISPLAY_CURRENCY)) ?? 1);
     }),
   );
+
+  for (const t of transactions) {
+    const fxRate = fxRates.get(t.currency) ?? 1;
+    const amount = toNumber(t.quantity) * toNumber(t.price) * fxRate;
+    contributionEvents.push({ date: toIsoDate(t.date), delta: t.type === "SELL" ? -amount : amount });
+  }
+  contributionEvents.sort((a, b) => a.date.localeCompare(b.date));
 
   const axis = buildDateAxis(start, end);
   const series: ValuePoint[] = [];
@@ -117,6 +131,8 @@ export async function getValueHistory(userId: string, start: Date, end: Date): P
   const qtyValue = new Map(symbols.map((s) => [s, 0]));
   const priceCursor = new Map(symbols.map((s) => [s, 0]));
   const priceValue = new Map(symbols.map((s) => [s, 0]));
+  let contributionIdx = 0;
+  let contributed = 0;
 
   for (const date of axis) {
     let total = 0;
@@ -150,7 +166,12 @@ export async function getValueHistory(userId: string, start: Date, end: Date): P
       total += qty * price * fxRate;
     }
 
-    series.push({ date, value: total });
+    while (contributionIdx < contributionEvents.length && contributionEvents[contributionIdx].date <= date) {
+      contributed += contributionEvents[contributionIdx].delta;
+      contributionIdx++;
+    }
+
+    series.push({ date, value: total, contributed });
   }
 
   return series;
