@@ -9,7 +9,7 @@ import { logoutAction } from "@/lib/actions/auth";
 import { Card } from "@/components/ui/Card";
 import { ValueHeader } from "@/components/dashboard/ValueHeader";
 import { AllocationDonut } from "@/components/dashboard/AllocationDonut";
-import { HoldingsList } from "@/components/dashboard/HoldingsList";
+import { PositionsTable } from "@/components/dashboard/PositionsTable";
 import { TopMovers } from "@/components/dashboard/TopMovers";
 import { ClosedPositionsList } from "@/components/dashboard/ClosedPositionsList";
 import { AddHoldingFab } from "@/components/dashboard/AddHoldingFab";
@@ -40,7 +40,7 @@ export function DashboardView({ initialSummary }: { initialSummary: PortfolioSum
     start: toIsoDate(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)),
     end: toIsoDate(new Date()),
   }));
-  const [assetGroups, setAssetGroups] = useState<Set<AssetGroup>>(new Set(ALL_ASSET_GROUPS));
+  const [assetGroups, setAssetGroups] = useState<Set<AssetGroup>>(new Set(["securities"]));
   const [chartTab, setChartTab] = useState<"value" | "drawdown">("value");
 
   const { data, isFetching, refetch } = useQuery({
@@ -100,10 +100,6 @@ export function DashboardView({ initialSummary }: { initialSummary: PortfolioSum
     : summary.totalInvested;
   const filteredTotalGain = filteredTotalValue - filteredTotalInvested;
   const filteredTotalGainPercent = filteredTotalInvested > 0 ? (filteredTotalGain / filteredTotalInvested) * 100 : 0;
-
-  const filteredClosedPositions = isAssetFiltered
-    ? summary.closedPositions.filter((p) => assetGroups.has(toAssetGroup(p.assetType)))
-    : summary.closedPositions;
 
   return (
     <div className="mx-auto min-h-dvh w-full max-w-lg bg-background pb-28">
@@ -244,17 +240,17 @@ export function DashboardView({ initialSummary }: { initialSummary: PortfolioSum
             </Link>
           </div>
           <div className="px-3">
-            <HoldingsList holdings={filteredHoldings} />
+            <PositionsTable holdings={summary.holdings} />
           </div>
         </Card>
 
-        {filteredClosedPositions.length > 0 && (
+        {summary.closedPositions.length > 0 && (
           <Card className="p-2">
             <div className="px-3 pt-2">
               <h2 className="text-sm font-semibold text-navy">Verkaufte Wertpapiere</h2>
             </div>
             <div className="px-3">
-              <ClosedPositionsList positions={filteredClosedPositions} />
+              <ClosedPositionsList positions={summary.closedPositions} />
             </div>
           </Card>
         )}

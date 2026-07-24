@@ -59,6 +59,14 @@ export function ValueHeader({
           </p>
         </div>
       </div>
+
+      <div className="mt-3 flex items-center justify-between border-t border-border pt-3">
+        <p className="text-sm font-semibold text-navy">Gewinn</p>
+        <p className={`text-base font-bold ${totalGain + totalRealizedGain >= 0 ? "text-accent-dark" : "text-negative"}`}>
+          {totalGain + totalRealizedGain >= 0 ? "+" : ""}
+          {formatEUR(totalGain + totalRealizedGain)}
+        </p>
+      </div>
     </div>
   );
 }
