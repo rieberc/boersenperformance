@@ -26,7 +26,17 @@ export type WatchlistPerformanceItem = WatchlistItem & {
   hasActiveAlert: boolean;
 };
 
-export type WatchlistPerformancePoint = { date: string; [symbol: string]: string | number | undefined };
+export type WatchlistPerformancePoint = { date: string; [key: string]: string | number | undefined };
+
+/** Points store each symbol's absolute price under `<symbol>::price`,
+ * alongside the symbol's own key (percent change) — so the chart tooltip
+ * can show both without plotting the price itself as a line. Kept as a
+ * plain string template (not a shared export) since this module pulls in
+ * server-only deps (Prisma, yahoo-finance2) that must never reach the
+ * "use client" chart that also needs this key format. */
+function pricePointKey(symbol: string): string {
+  return `${symbol}::price`;
+}
 
 export type WatchlistPerformance = {
   items: WatchlistPerformanceItem[];
@@ -93,15 +103,20 @@ export async function getWatchlistPerformance(
     const basePrice = prices[0].price;
     let cursor = 0;
     let lastPercent: number | null = null;
+    let lastPrice: number | null = null;
 
     for (let i = 0; i < axis.length; i++) {
       const date = axis[i];
       while (cursor < prices.length && prices[cursor].date <= date) {
-        lastPercent = basePrice !== 0 ? (prices[cursor].price / basePrice - 1) * 100 : 0;
+        lastPrice = prices[cursor].price;
+        lastPercent = basePrice !== 0 ? (lastPrice / basePrice - 1) * 100 : 0;
         cursor++;
       }
       if (lastPercent != null) {
         points[i][symbol] = lastPercent;
+      }
+      if (lastPrice != null) {
+        points[i][pricePointKey(symbol)] = lastPrice;
       }
     }
 

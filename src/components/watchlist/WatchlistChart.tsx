@@ -2,12 +2,60 @@
 
 import { Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { WatchlistPerformanceItem, WatchlistPerformancePoint } from "@/lib/portfolio/watchlist";
+import { formatCurrency } from "@/lib/utils/currency";
 
 export const WATCHLIST_COLORS = ["#0d2b4e", "#0ea780", "#e34850", "#f0a202", "#8aa4bd", "#5fb8a0"];
+
+// Matches the (non-exported) key format getWatchlistPerformance stores each
+// symbol's absolute price under — kept as a plain literal here rather than a
+// shared import, since that module pulls in server-only deps (Prisma,
+// yahoo-finance2) that must never reach this "use client" component.
+function pricePointKey(symbol: string): string {
+  return `${symbol}::price`;
+}
 
 function formatPercent(value: number) {
   const sign = value > 0 ? "+" : "";
   return `${sign}${value.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
+}
+
+type TooltipEntry = {
+  dataKey?: string | number;
+  name?: string;
+  value?: string | number;
+  color?: string;
+  payload?: WatchlistPerformancePoint;
+};
+
+function WatchlistTooltip({
+  active,
+  payload,
+  label,
+  currencyBySymbol,
+}: {
+  active?: boolean;
+  payload?: TooltipEntry[];
+  label?: string;
+  currencyBySymbol: Map<string, string>;
+}) {
+  if (!active || !payload || payload.length === 0) return null;
+
+  return (
+    <div className="rounded-lg border border-border bg-white px-3 py-2 text-xs shadow-lg">
+      <p className="mb-1 font-semibold text-navy">{new Date(String(label)).toLocaleDateString("de-DE")}</p>
+      {payload.map((entry) => {
+        const symbol = String(entry.dataKey);
+        const price = entry.payload?.[pricePointKey(symbol)];
+        const currency = currencyBySymbol.get(symbol);
+        return (
+          <p key={symbol} style={{ color: entry.color }}>
+            {entry.name}: {formatPercent(Number(entry.value))}
+            {typeof price === "number" && currency && ` · ${formatCurrency(price, currency)}`}
+          </p>
+        );
+      })}
+    </div>
+  );
 }
 
 export function WatchlistChart({
@@ -33,6 +81,8 @@ export function WatchlistChart({
     );
   }
 
+  const currencyBySymbol = new Map(items.map((item) => [item.symbol, item.currency]));
+
   return (
     <div className="h-64">
       <ResponsiveContainer width="100%" height="100%">
@@ -52,10 +102,7 @@ export function WatchlistChart({
             tickLine={false}
             tickFormatter={(v: number) => `${v}%`}
           />
-          <Tooltip
-            formatter={(value, name) => [formatPercent(Number(value)), name]}
-            labelFormatter={(label) => new Date(String(label)).toLocaleDateString("de-DE")}
-          />
+          <Tooltip content={<WatchlistTooltip currencyBySymbol={currencyBySymbol} />} />
           <Legend
             wrapperStyle={{ fontSize: 12 }}
             formatter={(value) => <span className="text-muted">{value}</span>}

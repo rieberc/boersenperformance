@@ -15,8 +15,10 @@ function toIsoDate(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
+const DEFAULT_PRESET: DateRangePreset = "30d";
+
 export function WatchlistView({ initialPerformance }: { initialPerformance: WatchlistPerformance }) {
-  const [preset, setPreset] = useState<DateRangePreset>("30d");
+  const [preset, setPreset] = useState<DateRangePreset>(DEFAULT_PRESET);
 
   const range = resolvePresetRange(preset, null);
   const startIso = toIsoDate(range.start);
@@ -29,10 +31,13 @@ export function WatchlistView({ initialPerformance }: { initialPerformance: Watc
       if (!res.ok) throw new Error("Laden fehlgeschlagen");
       return res.json();
     },
-    initialData: initialPerformance,
+    // Only seed initialData for the exact range it was fetched with —
+    // otherwise TanStack Query marks other ranges "fresh" too (given the
+    // app's 60s default staleTime) and never refetches them.
+    initialData: preset === DEFAULT_PRESET ? initialPerformance : undefined,
   });
 
-  const performance = data ?? initialPerformance;
+  const performance = data ?? (preset === DEFAULT_PRESET ? initialPerformance : { items: [], points: [] });
 
   return (
     <div className="mx-auto min-h-dvh w-full max-w-lg bg-background pb-28">
