@@ -4,18 +4,20 @@ import { useState } from "react";
 import { clsx } from "clsx";
 import type { AssetType } from "@/generated/prisma/client";
 
-export type AssetGroup = "securities" | "crypto";
+export type AssetGroup = "securities" | "crypto" | "cash";
 
-export const ALL_ASSET_GROUPS: AssetGroup[] = ["securities", "crypto"];
+export const ALL_ASSET_GROUPS: AssetGroup[] = ["securities", "crypto", "cash"];
 
 const GROUP_LABELS: Record<AssetGroup, string> = {
   securities: "Wertpapiere",
   crypto: "Kryptowährungen",
+  cash: "Zinsen",
 };
 
 const GROUP_ASSET_TYPES: Record<AssetGroup, AssetType[]> = {
   securities: ["STOCK", "ETF"],
   crypto: ["CRYPTO"],
+  cash: ["CASH"],
 };
 
 /** Undefined means "no filter" — either nothing or everything is selected. */
@@ -25,7 +27,9 @@ export function assetGroupsToTypesParam(groups: Set<AssetGroup>): string | undef
 }
 
 export function toAssetGroup(assetType: AssetType): AssetGroup {
-  return assetType === "CRYPTO" ? "crypto" : "securities";
+  if (assetType === "CRYPTO") return "crypto";
+  if (assetType === "CASH") return "cash";
+  return "securities";
 }
 
 export function AssetTypeFilter({
@@ -61,9 +65,7 @@ export function AssetTypeFilter({
   }
 
   const isFiltered = selected.size > 0 && selected.size < ALL_ASSET_GROUPS.length;
-  const label = isFiltered
-    ? [...selected].map((g) => GROUP_LABELS[g]).join(", ")
-    : "Wertpapiere";
+  const label = isFiltered ? [...selected].map((g) => GROUP_LABELS[g]).join(", ") : "Alle";
 
   return (
     <div className="relative">

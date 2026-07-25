@@ -22,6 +22,7 @@ export function ActivityRow({
   transaction: TransactionSummary;
   onClick: () => void;
 }) {
+  const isCash = transaction.assetType === "CASH";
   const amount = transaction.quantity * transaction.price;
 
   return (
@@ -33,14 +34,17 @@ export function ActivityRow({
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-semibold text-navy">{transaction.name}</p>
         <p className="text-xs text-muted">
-          {formatDate(transaction.date)} · {transaction.quantity} Stk.
+          {formatDate(transaction.date)}
+          {!isCash && ` · ${transaction.quantity} Stk.`}
         </p>
       </div>
 
       <div className="flex flex-col items-end gap-1">
         <p className="text-sm font-semibold text-navy">{formatCurrency(amount, transaction.currency)}</p>
-        <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${TYPE_COLOR[transaction.type]}`}>
-          {TYPE_LABEL[transaction.type]}
+        <span
+          className={`rounded-full px-2.5 py-1 text-xs font-semibold ${isCash ? "bg-accent-soft text-accent-dark" : TYPE_COLOR[transaction.type]}`}
+        >
+          {isCash ? "Zinsen" : TYPE_LABEL[transaction.type]}
         </span>
       </div>
     </button>

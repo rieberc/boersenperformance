@@ -10,6 +10,7 @@ const ASSET_TYPE_LABEL: Record<WatchlistPerformanceItem["assetType"], string> = 
   STOCK: "Aktie",
   ETF: "ETF",
   CRYPTO: "Crypto",
+  CASH: "Zinsen",
 };
 
 export function WatchlistRow({ item, color }: { item: WatchlistPerformanceItem; color: string }) {
@@ -25,7 +26,15 @@ export function WatchlistRow({ item, color }: { item: WatchlistPerformanceItem; 
         <span className="h-8 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: color }} />
 
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-navy">{item.name}</p>
+          <p className="flex items-center gap-1.5 truncate text-sm font-semibold text-navy">
+            {item.name}
+            {item.hasActiveAlert && (
+              <span
+                title="Alert aktiv"
+                className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-accent"
+              />
+            )}
+          </p>
           <p className="text-xs text-muted">
             {ASSET_TYPE_LABEL[item.assetType]} · {item.symbol}
           </p>

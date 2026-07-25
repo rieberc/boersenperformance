@@ -94,10 +94,19 @@ export async function getValueHistory(
   }
 
   const symbols = [...deltasBySymbol.keys()];
+  const cashSymbols = new Set(transactions.filter((t) => t.assetType === "CASH").map((t) => t.symbol));
   const priceSeriesBySymbol = new Map<string, { date: string; price: number }[]>();
   const priceCurrencyBySymbol = new Map<string, string>();
   await Promise.all(
     symbols.map(async (symbol) => {
+      // CASH holdings have no market price to look up — they're always
+      // worth exactly what was credited, so a single price=1 point covering
+      // the whole range is all forward-filling needs.
+      if (cashSymbols.has(symbol)) {
+        priceSeriesBySymbol.set(symbol, [{ date: toIsoDate(start), price: 1 }]);
+        priceCurrencyBySymbol.set(symbol, DISPLAY_CURRENCY);
+        return;
+      }
       const { currency, points } = await yahooPriceProvider.historicalPrices(symbol, start, end);
       priceSeriesBySymbol.set(symbol, removePriceOutliers(points));
       priceCurrencyBySymbol.set(symbol, currency);
@@ -119,6 +128,31 @@ export async function getValueHistory(
     }
   }
 
+  // Yahoo's historical chart can lag a day behind (or not yet reflect
+  // today's price at all), while getPortfolioSummary always uses the live
+  // quote for "now". When the requested range reaches today, patch the
+  // series' final price with that same live quote so the two stay
+  // reconciled — otherwise totals derived from this series (e.g. yearly/
+  // monthly performance) drift from the Depotwert/Kursgewinn shown elsewhere
+  // by the gap between yesterday's close and today's price.
+  if (toIsoDate(end) >= toIsoDate(new Date())) {
+    const liveSymbols = symbols.filter((s) => !cashSymbols.has(s));
+    const liveQuotes = await getQuotesWithCache(liveSymbols);
+    const endIso = toIsoDate(end);
+    for (const symbol of liveSymbols) {
+      const live = liveQuotes.get(symbol);
+      if (!live) continue;
+      const series = priceSeriesBySymbol.get(symbol)!;
+      const last = series[series.length - 1];
+      if (last && last.date === endIso) {
+        last.price = live.price;
+      } else {
+        series.push({ date: endIso, price: live.price });
+      }
+      priceCurrencyBySymbol.set(symbol, live.currency);
+    }
+  }
+
   const currencies = new Set(priceCurrencyBySymbol.values());
   for (const t of transactions) currencies.add(t.currency);
   const fxRates = new Map<string, number>();
@@ -129,6 +163,10 @@ export async function getValueHistory(
   );
 
   for (const t of transactions) {
+    // Interest credited to a CASH holding isn't capital the user contributed
+    // — it should show up as the value line pulling ahead of the
+    // contributed-capital line, not as an extra contribution.
+    if (t.assetType === "CASH") continue;
     const fxRate = fxRates.get(t.currency) ?? 1;
     const amount = toNumber(t.quantity) * toNumber(t.price) * fxRate;
     contributionEvents.push({ date: toIsoDate(t.date), delta: t.type === "SELL" ? -amount : amount });

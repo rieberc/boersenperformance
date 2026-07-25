@@ -127,7 +127,13 @@ function aggregatePositions(
       position.realizedCostBasis += costRemoved;
     } else {
       position.quantity += quantity;
-      position.costBasis += amountEUR;
+      // CASH positions (Tagesgeld/Festgeld interest, modeled as a Holding
+      // with price fixed at 1) aren't capital the user contributed — leaving
+      // costBasis at 0 means the full credited amount shows up as gain
+      // instead of inflating "Investiert".
+      if (t.assetType !== "CASH") {
+        position.costBasis += amountEUR;
+      }
       position.name = t.name;
       position.currency = t.currency;
     }
@@ -151,8 +157,17 @@ export async function getPortfolioSummary(userId: string, assetTypes?: AssetType
   // via a German broker) can differ from the currency the live quote is
   // denominated in (e.g. GBP for an LSE-listed ETF) — each needs its own FX
   // rate, so quotes are fetched first to know every currency involved.
-  const symbolsForQuotes = [...new Set(transactions.filter((t) => t.type !== "DIVIDEND").map((t) => t.symbol))];
+  const cashSymbols = new Set(transactions.filter((t) => t.assetType === "CASH").map((t) => t.symbol));
+  const symbolsForQuotes = [
+    ...new Set(transactions.filter((t) => t.type !== "DIVIDEND" && t.assetType !== "CASH").map((t) => t.symbol)),
+  ];
   const quotes = await getQuotesWithCache(symbolsForQuotes);
+  // CASH holdings have no market price — they're always worth exactly what
+  // was credited, so a real Yahoo lookup for a bank name would be wrong (or
+  // fail outright).
+  for (const symbol of cashSymbols) {
+    quotes.set(symbol, { price: 1, currency: DISPLAY_CURRENCY, updatedAt: new Date() });
+  }
 
   const currencies = new Set(transactions.map((t) => t.currency));
   for (const quote of quotes.values()) currencies.add(quote.currency);

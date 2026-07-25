@@ -88,6 +88,12 @@ export async function getPerformanceOverview(
     steuern += tax;
     gebuehren += fee;
 
+    // Interest credited to a CASH holding isn't an external cash flow the
+    // investor made — excluding it here (same as in getValueHistory's
+    // contribution tracking) lets it show up as pure return in IZF/TTWROR
+    // instead of a no-op contribution.
+    if (t.assetType === "CASH") continue;
+
     const dateKey = t.date.toISOString().slice(0, 10);
 
     if (t.type === "DIVIDEND") {

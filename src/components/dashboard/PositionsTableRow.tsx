@@ -11,12 +11,14 @@ const ASSET_TYPE_LABEL: Record<HoldingSummary["assetType"], string> = {
   STOCK: "Aktie",
   ETF: "ETF",
   CRYPTO: "Crypto",
+  CASH: "Zinsen",
 };
 
 const ASSET_TYPE_COLOR: Record<HoldingSummary["assetType"], string> = {
   STOCK: "bg-navy",
   ETF: "bg-accent",
   CRYPTO: "bg-amber-500",
+  CASH: "bg-slate-500",
 };
 
 function formatSignedEUR(value: number) {
@@ -52,6 +54,7 @@ function Stat({
 
 export function PositionsTableRow({ holding }: { holding: HoldingSummary }) {
   const [open, setOpen] = useState(false);
+  const isCash = holding.assetType === "CASH";
   const hasDividends = holding.dividends > 1e-9;
   const hasRealized = Math.abs(holding.realizedGain) > 1e-9;
 
@@ -87,16 +90,20 @@ export function PositionsTableRow({ holding }: { holding: HoldingSummary }) {
         </div>
 
         <div className="flex flex-wrap items-start gap-x-4 gap-y-2 pl-[52px]">
-          <Stat
-            label="Einstieg"
-            value={formatEUR(holding.investedValue)}
-            sub={formatCurrency(holding.avgPrice, holding.currency)}
-          />
-          <Stat
-            label="Bestand"
-            value={`${holding.quantity.toLocaleString("de-DE", { maximumFractionDigits: 4 })}x`}
-            sub={holding.currentPrice != null ? formatCurrency(holding.currentPrice, holding.currency) : "–"}
-          />
+          {!isCash && (
+            <>
+              <Stat
+                label="Einstieg"
+                value={formatEUR(holding.investedValue)}
+                sub={formatCurrency(holding.avgPrice, holding.currency)}
+              />
+              <Stat
+                label="Bestand"
+                value={`${holding.quantity.toLocaleString("de-DE", { maximumFractionDigits: 4 })}x`}
+                sub={holding.currentPrice != null ? formatCurrency(holding.currentPrice, holding.currency) : "–"}
+              />
+            </>
+          )}
           {hasDividends && (
             <Stat
               label="Dividenden"

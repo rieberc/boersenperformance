@@ -23,6 +23,7 @@ export type WatchlistPerformanceItem = WatchlistItem & {
   currentPrice: number | null;
   priceUpdatedAt: string | null;
   changePercent: number | null;
+  hasActiveAlert: boolean;
 };
 
 export type WatchlistPerformancePoint = { date: string; [symbol: string]: string | number | undefined };
@@ -62,7 +63,7 @@ export async function getWatchlistPerformance(
   if (items.length === 0) return { items: [], points: [] };
 
   const symbols = items.map((i) => i.symbol);
-  const [quotes, historicalEntries] = await Promise.all([
+  const [quotes, historicalEntries, activeAlerts] = await Promise.all([
     getQuotesWithCache(symbols),
     Promise.all(
       symbols.map(async (symbol) => {
@@ -70,8 +71,13 @@ export async function getWatchlistPerformance(
         return [symbol, points] as const;
       }),
     ),
+    prisma.priceAlert.findMany({
+      where: { userId, active: true, symbol: { in: symbols } },
+      select: { symbol: true },
+    }),
   ]);
   const historicalBySymbol = new Map(historicalEntries);
+  const alertedSymbols = new Set(activeAlerts.map((a) => a.symbol));
 
   const axis = buildDateAxis(start, end);
   const points: WatchlistPerformancePoint[] = axis.map((date) => ({ date }));
@@ -109,6 +115,7 @@ export async function getWatchlistPerformance(
       currentPrice: quote?.price ?? null,
       priceUpdatedAt: quote?.updatedAt.toISOString() ?? null,
       changePercent: changeBySymbol.get(item.symbol) ?? null,
+      hasActiveAlert: alertedSymbols.has(item.symbol),
     };
   });
 

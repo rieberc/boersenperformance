@@ -6,6 +6,7 @@ const ASSET_TYPE_COLOR: Record<HoldingSummary["assetType"], string> = {
   STOCK: "bg-navy",
   ETF: "bg-accent",
   CRYPTO: "bg-amber-500",
+  CASH: "bg-slate-500",
 };
 
 function MoverList({ holdings }: { holdings: HoldingSummary[] }) {
