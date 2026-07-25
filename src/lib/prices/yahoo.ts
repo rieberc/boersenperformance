@@ -100,6 +100,35 @@ export const yahooPriceProvider: PriceProvider = {
     }
   },
 
+  async allTimeHighs(symbols) {
+    const unique = [...new Set(symbols)];
+    const out = new Map<string, number | null>();
+    if (unique.length === 0) return out;
+
+    // quoteSummary has no multi-symbol batch endpoint, unlike quote() —
+    // one request per symbol.
+    const results = await Promise.allSettled(
+      unique.map((symbol) => yahooFinance.quoteSummary(symbol, { modules: ["summaryDetail"] })),
+    );
+
+    results.forEach((result, i) => {
+      const symbol = unique[i];
+      if (result.status !== "fulfilled") {
+        out.set(symbol, null);
+        return;
+      }
+      const raw = result.value.summaryDetail?.allTimeHigh;
+      if (raw == null) {
+        out.set(symbol, null);
+        return;
+      }
+      const { price } = normalizeCurrency(result.value.summaryDetail?.currency ?? "USD", raw);
+      out.set(symbol, price);
+    });
+
+    return out;
+  },
+
   async fxRate(from, to) {
     if (from === to) return 1;
 

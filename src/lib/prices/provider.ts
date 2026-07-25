@@ -29,4 +29,5 @@ export interface PriceProvider {
   quotes(symbols: string[]): Promise<PriceQuote[]>;
   fxRate(from: string, to: string): Promise<number | null>;
   historicalPrices(symbol: string, start: Date, end: Date): Promise<HistoricalPriceSeries>;
+  allTimeHighs(symbols: string[]): Promise<Map<string, number | null>>;
 }
