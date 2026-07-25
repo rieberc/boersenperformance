@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { WatchlistPerformanceItem, WatchlistPerformancePoint } from "@/lib/portfolio/watchlist";
 import { formatCurrency } from "@/lib/utils/currency";
@@ -65,6 +66,8 @@ export function WatchlistChart({
   items: WatchlistPerformanceItem[];
   points: WatchlistPerformancePoint[];
 }) {
+  const [hiddenSymbols, setHiddenSymbols] = useState<Set<string>>(new Set());
+
   if (items.length === 0) {
     return (
       <div className="flex h-56 items-center justify-center text-sm text-muted">
@@ -82,6 +85,16 @@ export function WatchlistChart({
   }
 
   const currencyBySymbol = new Map(items.map((item) => [item.symbol, item.currency]));
+  const colorBySymbol = new Map(items.map((item, index) => [item.symbol, WATCHLIST_COLORS[index % WATCHLIST_COLORS.length]]));
+
+  function toggle(symbol: string) {
+    setHiddenSymbols((prev) => {
+      const next = new Set(prev);
+      if (next.has(symbol)) next.delete(symbol);
+      else next.add(symbol);
+      return next;
+    });
+  }
 
   return (
     <div className="h-64">
@@ -104,19 +117,30 @@ export function WatchlistChart({
           />
           <Tooltip content={<WatchlistTooltip currencyBySymbol={currencyBySymbol} />} />
           <Legend
-            wrapperStyle={{ fontSize: 12 }}
-            formatter={(value) => <span className="text-muted">{value}</span>}
+            wrapperStyle={{ fontSize: 12, cursor: "pointer" }}
+            onClick={(entry) => {
+              if (typeof entry.dataKey === "string") toggle(entry.dataKey);
+            }}
+            formatter={(value, entry) => (
+              <span
+                className={hiddenSymbols.has(String(entry.dataKey)) ? "text-muted line-through" : "text-muted"}
+              >
+                {value}
+              </span>
+            )}
           />
-          {items.map((item, index) => (
+          {items.map((item) => (
             <Line
               key={item.symbol}
               type="monotone"
               dataKey={item.symbol}
               name={item.name}
-              stroke={WATCHLIST_COLORS[index % WATCHLIST_COLORS.length]}
+              stroke={colorBySymbol.get(item.symbol)}
               strokeWidth={2}
               dot={false}
               connectNulls
+              hide={hiddenSymbols.has(item.symbol)}
+              isAnimationActive={false}
             />
           ))}
         </LineChart>

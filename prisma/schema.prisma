@@ -101,10 +101,11 @@ model PushSubscription {
 }
 
 model PriceCache {
-  symbol    String   @id
-  price     Decimal
-  currency  String
-  updatedAt DateTime @updatedAt
+  symbol      String   @id
+  price       Decimal
+  currency    String
+  allTimeHigh Decimal?
+  updatedAt   DateTime @updatedAt
 }
 
 model FxRateCache {

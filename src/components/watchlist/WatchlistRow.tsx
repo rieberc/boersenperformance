@@ -13,6 +13,11 @@ const ASSET_TYPE_LABEL: Record<WatchlistPerformanceItem["assetType"], string> = 
   CASH: "Zinsen",
 };
 
+function formatAthDeviation(value: number) {
+  const sign = value > 0 ? "+" : "";
+  return `${sign}${value.toLocaleString("de-DE", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
+}
+
 export function WatchlistRow({ item, color }: { item: WatchlistPerformanceItem; color: string }) {
   const [open, setOpen] = useState(false);
 
@@ -45,6 +50,14 @@ export function WatchlistRow({ item, color }: { item: WatchlistPerformanceItem; 
             {item.currentPrice != null ? formatCurrency(item.currentPrice, item.currency) : "–"}
           </p>
           {item.changePercent != null && <GainPill percent={item.changePercent} />}
+          {item.allTimeHigh != null && item.athDeviationPercent != null && (
+            <p
+              className="text-[11px] text-muted"
+              title={`Allzeithoch: ${formatCurrency(item.allTimeHigh, item.currency)}`}
+            >
+              ATH {formatAthDeviation(item.athDeviationPercent)}
+            </p>
+          )}
         </div>
       </button>
 

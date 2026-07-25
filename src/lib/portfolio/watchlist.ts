@@ -24,6 +24,8 @@ export type WatchlistPerformanceItem = WatchlistItem & {
   priceUpdatedAt: string | null;
   changePercent: number | null;
   hasActiveAlert: boolean;
+  allTimeHigh: number | null;
+  athDeviationPercent: number | null;
 };
 
 export type WatchlistPerformancePoint = { date: string; [key: string]: string | number | undefined };
@@ -125,12 +127,17 @@ export async function getWatchlistPerformance(
 
   const itemsWithPerformance: WatchlistPerformanceItem[] = items.map((item) => {
     const quote = quotes.get(item.symbol);
+    const allTimeHigh = quote?.allTimeHigh ?? null;
+    const athDeviationPercent =
+      allTimeHigh != null && allTimeHigh !== 0 && quote?.price != null ? (quote.price / allTimeHigh - 1) * 100 : null;
     return {
       ...item,
       currentPrice: quote?.price ?? null,
       priceUpdatedAt: quote?.updatedAt.toISOString() ?? null,
       changePercent: changeBySymbol.get(item.symbol) ?? null,
       hasActiveAlert: alertedSymbols.has(item.symbol),
+      allTimeHigh,
+      athDeviationPercent,
     };
   });
 

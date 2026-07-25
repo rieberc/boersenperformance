@@ -4,7 +4,7 @@ import { toNumber } from "@/lib/utils/decimal";
 
 const PRICE_TTL_MS = 10 * 60 * 1000;
 
-export type CachedPrice = { price: number; currency: string; updatedAt: Date };
+export type CachedPrice = { price: number; currency: string; updatedAt: Date; allTimeHigh: number | null };
 
 export async function getQuotesWithCache(symbols: string[]): Promise<Map<string, CachedPrice>> {
   const unique = [...new Set(symbols)];
@@ -23,27 +23,42 @@ export async function getQuotesWithCache(symbols: string[]): Promise<Map<string,
   for (const symbol of unique) {
     const entry = cachedBySymbol.get(symbol);
     if (entry) {
-      result.set(symbol, { price: toNumber(entry.price), currency: entry.currency, updatedAt: entry.updatedAt });
+      result.set(symbol, {
+        price: toNumber(entry.price),
+        currency: entry.currency,
+        updatedAt: entry.updatedAt,
+        allTimeHigh: entry.allTimeHigh != null ? toNumber(entry.allTimeHigh) : null,
+      });
     }
   }
 
   if (stale.length === 0) return result;
 
-  const fresh = await yahooPriceProvider.quotes(stale);
+  const [fresh, freshAllTimeHighs] = await Promise.all([
+    yahooPriceProvider.quotes(stale),
+    yahooPriceProvider.allTimeHighs(stale),
+  ]);
   const fetchedAt = new Date();
 
   await Promise.all(
-    fresh.map((q) =>
-      prisma.priceCache.upsert({
+    fresh.map((q) => {
+      const allTimeHigh = freshAllTimeHighs.get(q.symbol) ?? null;
+      return prisma.priceCache.upsert({
         where: { symbol: q.symbol },
-        create: { symbol: q.symbol, price: q.price, currency: q.currency },
-        update: { price: q.price, currency: q.currency },
-      }),
-    ),
+        create: { symbol: q.symbol, price: q.price, currency: q.currency, allTimeHigh },
+        // Only overwrite a previously known all-time high when this fetch
+        // actually returned one — a transient quoteSummary failure
+        // shouldn't blank out a good cached value.
+        update: allTimeHigh != null ? { price: q.price, currency: q.currency, allTimeHigh } : { price: q.price, currency: q.currency },
+      });
+    }),
   );
 
   for (const q of fresh) {
-    result.set(q.symbol, { price: q.price, currency: q.currency, updatedAt: fetchedAt });
+    const previousEntry = cachedBySymbol.get(q.symbol);
+    const allTimeHigh =
+      freshAllTimeHighs.get(q.symbol) ?? (previousEntry?.allTimeHigh != null ? toNumber(previousEntry.allTimeHigh) : null);
+    result.set(q.symbol, { price: q.price, currency: q.currency, updatedAt: fetchedAt, allTimeHigh });
   }
 
   return result;

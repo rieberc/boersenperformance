@@ -166,7 +166,7 @@ export async function getPortfolioSummary(userId: string, assetTypes?: AssetType
   // was credited, so a real Yahoo lookup for a bank name would be wrong (or
   // fail outright).
   for (const symbol of cashSymbols) {
-    quotes.set(symbol, { price: 1, currency: DISPLAY_CURRENCY, updatedAt: new Date() });
+    quotes.set(symbol, { price: 1, currency: DISPLAY_CURRENCY, updatedAt: new Date(), allTimeHigh: null });
   }
 
   const currencies = new Set(transactions.map((t) => t.currency));
