@@ -1,6 +1,6 @@
 import type { AssetType } from "@/generated/prisma/client";
 
-const VALID_ASSET_TYPES: AssetType[] = ["STOCK", "ETF", "CRYPTO"];
+const VALID_ASSET_TYPES: AssetType[] = ["STOCK", "ETF", "CRYPTO", "CASH"];
 
 export function parseAssetTypesParam(param: string | null): AssetType[] | undefined {
   if (!param) return undefined;

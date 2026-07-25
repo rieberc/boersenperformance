@@ -5,12 +5,14 @@ const ASSET_TYPE_LABEL: Record<ClosedPositionSummary["assetType"], string> = {
   STOCK: "Aktie",
   ETF: "ETF",
   CRYPTO: "Crypto",
+  CASH: "Zinsen",
 };
 
 const ASSET_TYPE_COLOR: Record<ClosedPositionSummary["assetType"], string> = {
   STOCK: "bg-navy",
   ETF: "bg-accent",
   CRYPTO: "bg-amber-500",
+  CASH: "bg-slate-500",
 };
 
 export function ClosedPositionsList({ positions }: { positions: ClosedPositionSummary[] }) {

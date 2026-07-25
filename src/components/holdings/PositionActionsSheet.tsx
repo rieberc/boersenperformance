@@ -38,9 +38,11 @@ export function PositionActionsSheet({
     <Sheet open={open} onClose={handleClose} title={holding.name}>
       {step === "menu" ? (
         <div className="flex flex-col gap-3">
-          <Button variant="secondary" onClick={() => setStep("sell")} className="w-full">
-            Verkaufen
-          </Button>
+          {holding.assetType !== "CASH" && (
+            <Button variant="secondary" onClick={() => setStep("sell")} className="w-full">
+              Verkaufen
+            </Button>
+          )}
           <Button
             variant="ghost"
             disabled={isDeleting}

@@ -107,6 +107,13 @@ export function DashboardView({ initialSummary }: { initialSummary: PortfolioSum
         <h1 className="text-lg font-bold text-navy">Mein Depot</h1>
         <div className="flex items-center gap-1">
           <Link
+            href="/dashboard/performance"
+            aria-label="Performance im Verlauf"
+            className="rounded-full p-2 text-navy hover:bg-black/5"
+          >
+            ↗
+          </Link>
+          <Link
             href="/dashboard/watchlist"
             aria-label="Watchlist"
             className="rounded-full p-2 text-navy hover:bg-black/5"
