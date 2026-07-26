@@ -162,14 +162,40 @@ export async function getValueHistory(
     }),
   );
 
+  // A SELL should only pull back out the cost basis of what was sold, not
+  // the full sale proceeds — otherwise cashing out a position at a large
+  // profit drags "Zugeführtes Kapital" down by more than was ever actually
+  // contributed, sending it needlessly negative. Tracked per symbol with the
+  // same average-cost method used elsewhere (aggregatePositions in
+  // summary.ts); `transactions` is already ordered by date, so a single
+  // forward pass keeps a running cost basis and quantity per symbol.
+  const costBasisBySymbol = new Map<string, number>();
+  const costQtyBySymbol = new Map<string, number>();
+
   for (const t of transactions) {
     // Interest credited to a CASH holding isn't capital the user contributed
     // — it should show up as the value line pulling ahead of the
     // contributed-capital line, not as an extra contribution.
     if (t.assetType === "CASH") continue;
+
     const fxRate = fxRates.get(t.currency) ?? 1;
-    const amount = toNumber(t.quantity) * toNumber(t.price) * fxRate;
-    contributionEvents.push({ date: toIsoDate(t.date), delta: t.type === "SELL" ? -amount : amount });
+    const qty = toNumber(t.quantity);
+    const amount = qty * toNumber(t.price) * fxRate;
+    const prevCostBasis = costBasisBySymbol.get(t.symbol) ?? 0;
+    const prevQty = costQtyBySymbol.get(t.symbol) ?? 0;
+
+    if (t.type === "SELL") {
+      const avgCostPerUnit = prevQty > 0 ? prevCostBasis / prevQty : 0;
+      const soldQty = Math.min(qty, prevQty);
+      const costRemoved = avgCostPerUnit * soldQty;
+      contributionEvents.push({ date: toIsoDate(t.date), delta: -costRemoved });
+      costBasisBySymbol.set(t.symbol, prevCostBasis - costRemoved);
+      costQtyBySymbol.set(t.symbol, prevQty - soldQty);
+    } else {
+      contributionEvents.push({ date: toIsoDate(t.date), delta: amount });
+      costBasisBySymbol.set(t.symbol, prevCostBasis + amount);
+      costQtyBySymbol.set(t.symbol, prevQty + qty);
+    }
   }
   contributionEvents.sort((a, b) => a.date.localeCompare(b.date));
 

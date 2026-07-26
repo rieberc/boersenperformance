@@ -18,15 +18,24 @@ function formatAthDeviation(value: number) {
   return `${sign}${value.toLocaleString("de-DE", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
 }
 
-export function WatchlistRow({ item, color }: { item: WatchlistPerformanceItem; color: string }) {
+export function WatchlistRow({
+  item,
+  color,
+  readOnly = false,
+}: {
+  item: WatchlistPerformanceItem;
+  color: string;
+  readOnly?: boolean;
+}) {
   const [open, setOpen] = useState(false);
 
   return (
     <>
       <button
         type="button"
-        onClick={() => setOpen(true)}
-        className="flex w-full items-center gap-3 py-3 text-left"
+        onClick={readOnly ? undefined : () => setOpen(true)}
+        disabled={readOnly}
+        className="flex w-full items-center gap-3 py-3 text-left disabled:cursor-default"
       >
         <span className="h-8 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: color }} />
 
@@ -61,7 +70,7 @@ export function WatchlistRow({ item, color }: { item: WatchlistPerformanceItem; 
         </div>
       </button>
 
-      <WatchlistItemActionsSheet item={item} open={open} onClose={() => setOpen(false)} />
+      {!readOnly && <WatchlistItemActionsSheet item={item} open={open} onClose={() => setOpen(false)} />}
     </>
   );
 }

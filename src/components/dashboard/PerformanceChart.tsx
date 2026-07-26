@@ -10,17 +10,27 @@ function formatCompactEUR(value: number) {
     style: "currency",
     currency: "EUR",
     notation: "compact",
-    maximumFractionDigits: 1,
+    maximumFractionDigits: 0,
   });
 }
 
-export function PerformanceChart({ start, end, types }: { start: string; end: string; types?: string }) {
+export function PerformanceChart({
+  start,
+  end,
+  types,
+  basePath = "/api/portfolio",
+}: {
+  start: string;
+  end: string;
+  types?: string;
+  basePath?: string;
+}) {
   const { data, isFetching } = useQuery({
-    queryKey: ["portfolio", "history", start, end, types ?? null],
+    queryKey: ["portfolio", "history", basePath, start, end, types ?? null],
     queryFn: async (): Promise<{ series: ValuePoint[] }> => {
       const url = types
-        ? `/api/portfolio/history?start=${start}&end=${end}&types=${types}`
-        : `/api/portfolio/history?start=${start}&end=${end}`;
+        ? `${basePath}/history?start=${start}&end=${end}&types=${types}`
+        : `${basePath}/history?start=${start}&end=${end}`;
       const res = await fetch(url);
       if (!res.ok) throw new Error("Laden fehlgeschlagen");
       return res.json();
@@ -44,7 +54,7 @@ export function PerformanceChart({ start, end, types }: { start: string; end: st
   return (
     <div className="h-64">
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={series} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+        <LineChart data={series} margin={{ top: 8, right: 8, bottom: 0, left: 4 }}>
           <XAxis
             dataKey="date"
             tick={{ fontSize: 11, fill: "#6b7684" }}
@@ -54,7 +64,7 @@ export function PerformanceChart({ start, end, types }: { start: string; end: st
             tickLine={false}
           />
           <YAxis
-            width={56}
+            width={80}
             tick={{ fontSize: 11, fill: "#6b7684" }}
             tickFormatter={(v: number) => formatCompactEUR(v)}
             axisLine={false}

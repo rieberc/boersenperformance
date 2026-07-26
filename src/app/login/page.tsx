@@ -45,6 +45,13 @@ export default function LoginPage() {
             Registrieren
           </Link>
         </p>
+
+        <p className="mt-3 text-center text-sm text-muted">
+          Erst mal reinschauen?{" "}
+          <Link href="/demo" className="font-semibold text-accent-dark">
+            Demo ansehen
+          </Link>
+        </p>
       </div>
     </main>
   );

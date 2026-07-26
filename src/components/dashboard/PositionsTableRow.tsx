@@ -52,7 +52,7 @@ function Stat({
   );
 }
 
-export function PositionsTableRow({ holding }: { holding: HoldingSummary }) {
+export function PositionsTableRow({ holding, readOnly = false }: { holding: HoldingSummary; readOnly?: boolean }) {
   const [open, setOpen] = useState(false);
   const isCash = holding.assetType === "CASH";
   const hasDividends = holding.dividends > 1e-9;
@@ -62,8 +62,9 @@ export function PositionsTableRow({ holding }: { holding: HoldingSummary }) {
     <>
       <button
         type="button"
-        onClick={() => setOpen(true)}
-        className="flex w-full flex-col gap-2 py-3 text-left"
+        onClick={readOnly ? undefined : () => setOpen(true)}
+        disabled={readOnly}
+        className="flex w-full flex-col gap-2 py-3 text-left disabled:cursor-default"
       >
         <div className="flex w-full items-center gap-3">
           <div
@@ -132,7 +133,7 @@ export function PositionsTableRow({ holding }: { holding: HoldingSummary }) {
         </div>
       </button>
 
-      <PositionActionsSheet holding={holding} open={open} onClose={() => setOpen(false)} />
+      {!readOnly && <PositionActionsSheet holding={holding} open={open} onClose={() => setOpen(false)} />}
     </>
   );
 }

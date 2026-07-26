@@ -94,16 +94,24 @@ function YearRow({ year }: { year: YearPerformance }) {
 // with — the default filter state below resolves to the same param.
 const DEFAULT_TYPES_PARAM = "STOCK,ETF";
 
-export function PerformanceHistoryView({ initialYears }: { initialYears: YearPerformance[] }) {
+export function PerformanceHistoryView({
+  initialYears,
+  basePath = "/api/portfolio",
+  backHref = "/dashboard",
+}: {
+  initialYears: YearPerformance[];
+  basePath?: string;
+  backHref?: string;
+}) {
   const [assetGroups, setAssetGroups] = useState<Set<AssetGroup>>(new Set(["securities"]));
   const typesParam = assetGroupsToTypesParam(assetGroups);
 
   const { data } = useQuery({
-    queryKey: ["portfolio", "yearly-performance", typesParam ?? null],
+    queryKey: ["portfolio", "yearly-performance", basePath, typesParam ?? null],
     queryFn: async (): Promise<YearPerformance[]> => {
       const url = typesParam
-        ? `/api/portfolio/yearly-performance?types=${typesParam}`
-        : "/api/portfolio/yearly-performance";
+        ? `${basePath}/yearly-performance?types=${typesParam}`
+        : `${basePath}/yearly-performance`;
       const res = await fetch(url);
       if (!res.ok) throw new Error("Laden fehlgeschlagen");
       const json = await res.json();
@@ -122,7 +130,7 @@ export function PerformanceHistoryView({ initialYears }: { initialYears: YearPer
     <div className="mx-auto min-h-dvh w-full max-w-lg bg-background pb-10">
       <header className="safe-top flex items-center gap-3 px-5 pt-6 pb-4">
         <Link
-          href="/dashboard"
+          href={backHref}
           aria-label="Zurück"
           className="rounded-full p-2 text-navy hover:bg-black/5"
         >

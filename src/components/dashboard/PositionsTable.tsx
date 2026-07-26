@@ -1,7 +1,7 @@
 import { PositionsTableRow } from "@/components/dashboard/PositionsTableRow";
 import type { HoldingSummary } from "@/lib/portfolio/summary";
 
-export function PositionsTable({ holdings }: { holdings: HoldingSummary[] }) {
+export function PositionsTable({ holdings, readOnly = false }: { holdings: HoldingSummary[]; readOnly?: boolean }) {
   if (holdings.length === 0) {
     return (
       <div className="py-10 text-center">
@@ -18,7 +18,7 @@ export function PositionsTable({ holdings }: { holdings: HoldingSummary[] }) {
   return (
     <div className="divide-y divide-border">
       {sorted.map((holding) => (
-        <PositionsTableRow key={holding.symbol} holding={holding} />
+        <PositionsTableRow key={holding.symbol} holding={holding} readOnly={readOnly} />
       ))}
     </div>
   );
