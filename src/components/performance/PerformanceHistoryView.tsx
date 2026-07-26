@@ -43,20 +43,33 @@ function AmountCell({ absolute, percent }: { absolute: number; percent: number |
 /** Chains each year's TWR factor together (same technique used to derive a
  * year's own percent from its months) so the total percent compounds
  * correctly instead of just averaging or summing the yearly percentages. */
-function totalAcrossYears(years: YearPerformance[]): { absoluteGain: number; percentGain: number | null } {
+function totalAcrossYears(
+  years: YearPerformance[],
+): { absoluteGain: number; percentGain: number | null; realizedGain: number } {
   let absoluteGain = 0;
+  let realizedGain = 0;
   let factor = 1;
   let hasData = false;
 
   for (const y of years) {
     absoluteGain += y.absoluteGain;
+    realizedGain += y.realizedGain;
     if (y.percentGain != null) {
       factor *= 1 + y.percentGain / 100;
       hasData = true;
     }
   }
 
-  return { absoluteGain, percentGain: hasData ? (factor - 1) * 100 : null };
+  return { absoluteGain, percentGain: hasData ? (factor - 1) * 100 : null, realizedGain };
+}
+
+function RealizedGainNote({ realizedGain }: { realizedGain: number }) {
+  if (Math.abs(realizedGain) < 1e-9) return null;
+  return (
+    <p className="pb-2 text-xs text-muted">
+      Realisierter Gewinn: <span className="font-medium text-accent-dark">{formatSignedEUR(realizedGain)}</span>
+    </p>
+  );
 }
 
 function YearRow({ year }: { year: YearPerformance }) {
@@ -75,13 +88,17 @@ function YearRow({ year }: { year: YearPerformance }) {
         </span>
         <AmountCell absolute={year.absoluteGain} percent={year.percentGain} />
       </button>
+      <RealizedGainNote realizedGain={year.realizedGain} />
 
       {open && (
         <div className="divide-y divide-border pb-2 pl-5">
           {year.months.map((m) => (
-            <div key={m.month} className="flex items-center justify-between py-2">
-              <span className="text-sm text-muted">{MONTH_NAMES[m.month - 1]}</span>
-              <AmountCell absolute={m.absoluteGain} percent={m.percentGain} />
+            <div key={m.month} className="py-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted">{MONTH_NAMES[m.month - 1]}</span>
+                <AmountCell absolute={m.absoluteGain} percent={m.percentGain} />
+              </div>
+              <RealizedGainNote realizedGain={m.realizedGain} />
             </div>
           ))}
         </div>
@@ -153,9 +170,12 @@ export function PerformanceHistoryView({
                 <YearRow key={y.year} year={y} />
               ))}
 
-              <div className="flex items-center justify-between border-t border-border py-3">
-                <span className="text-sm font-semibold text-navy">Gesamt</span>
-                <AmountCell absolute={total.absoluteGain} percent={total.percentGain} />
+              <div className="border-t border-border pt-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold text-navy">Gesamt</span>
+                  <AmountCell absolute={total.absoluteGain} percent={total.percentGain} />
+                </div>
+                <RealizedGainNote realizedGain={total.realizedGain} />
               </div>
             </div>
           )}

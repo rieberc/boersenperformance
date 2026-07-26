@@ -5,7 +5,7 @@ import { toNumber } from "@/lib/utils/decimal";
 import { DISPLAY_CURRENCY } from "@/lib/portfolio/summary";
 import type { AssetType } from "@/generated/prisma/client";
 
-export type ValuePoint = { date: string; value: number; contributed: number };
+export type ValuePoint = { date: string; value: number; contributed: number; realizedGain: number };
 
 function toIsoDate(d: Date): string {
   return d.toISOString().slice(0, 10);
@@ -85,6 +85,7 @@ export async function getValueHistory(
 
   const deltasBySymbol = new Map<string, { date: string; delta: number }[]>();
   const contributionEvents: { date: string; delta: number }[] = [];
+  const realizedGainEvents: { date: string; delta: number }[] = [];
 
   for (const t of transactions) {
     const list = deltasBySymbol.get(t.symbol) ?? [];
@@ -189,6 +190,7 @@ export async function getValueHistory(
       const soldQty = Math.min(qty, prevQty);
       const costRemoved = avgCostPerUnit * soldQty;
       contributionEvents.push({ date: toIsoDate(t.date), delta: -costRemoved });
+      realizedGainEvents.push({ date: toIsoDate(t.date), delta: amount - costRemoved });
       costBasisBySymbol.set(t.symbol, prevCostBasis - costRemoved);
       costQtyBySymbol.set(t.symbol, prevQty - soldQty);
     } else {
@@ -198,6 +200,7 @@ export async function getValueHistory(
     }
   }
   contributionEvents.sort((a, b) => a.date.localeCompare(b.date));
+  realizedGainEvents.sort((a, b) => a.date.localeCompare(b.date));
 
   const axis = buildDateAxis(start, end);
   const series: ValuePoint[] = [];
@@ -208,6 +211,8 @@ export async function getValueHistory(
   const priceValue = new Map(symbols.map((s) => [s, 0]));
   let contributionIdx = 0;
   let contributed = 0;
+  let realizedGainIdx = 0;
+  let realizedGain = 0;
 
   for (const date of axis) {
     let total = 0;
@@ -246,7 +251,12 @@ export async function getValueHistory(
       contributionIdx++;
     }
 
-    series.push({ date, value: total, contributed });
+    while (realizedGainIdx < realizedGainEvents.length && realizedGainEvents[realizedGainIdx].date <= date) {
+      realizedGain += realizedGainEvents[realizedGainIdx].delta;
+      realizedGainIdx++;
+    }
+
+    series.push({ date, value: total, contributed, realizedGain });
   }
 
   return series;

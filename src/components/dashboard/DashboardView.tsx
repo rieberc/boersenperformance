@@ -43,7 +43,7 @@ export function DashboardView({
   readOnly?: boolean;
 }) {
   const [importOpen, setImportOpen] = useState(false);
-  const [preset, setPreset] = useState<DateRangePreset>("sinceBuy");
+  const [preset, setPreset] = useState<DateRangePreset>("6m");
   const [customRange, setCustomRange] = useState(() => ({
     start: toIsoDate(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)),
     end: toIsoDate(new Date()),
