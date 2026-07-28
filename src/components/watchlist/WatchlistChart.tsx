@@ -86,6 +86,7 @@ export function WatchlistChart({
 
   const currencyBySymbol = new Map(items.map((item) => [item.symbol, item.currency]));
   const colorBySymbol = new Map(items.map((item, index) => [item.symbol, WATCHLIST_COLORS[index % WATCHLIST_COLORS.length]]));
+  const allHidden = items.every((item) => hiddenSymbols.has(item.symbol));
 
   function toggle(symbol: string) {
     setHiddenSymbols((prev) => {
@@ -96,55 +97,67 @@ export function WatchlistChart({
     });
   }
 
+  function toggleAll() {
+    setHiddenSymbols(allHidden ? new Set() : new Set(items.map((item) => item.symbol)));
+  }
+
   return (
-    <div className="h-64">
-      <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={points} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
-          <XAxis
-            dataKey="date"
-            tick={{ fontSize: 11, fill: "#6b7684" }}
-            tickFormatter={(v: string) => new Date(v).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" })}
-            minTickGap={40}
-            axisLine={false}
-            tickLine={false}
-          />
-          <YAxis
-            width={40}
-            tick={{ fontSize: 11, fill: "#6b7684" }}
-            axisLine={false}
-            tickLine={false}
-            tickFormatter={(v: number) => `${v}%`}
-          />
-          <Tooltip content={<WatchlistTooltip currencyBySymbol={currencyBySymbol} />} />
-          <Legend
-            wrapperStyle={{ fontSize: 12, cursor: "pointer" }}
-            onClick={(entry) => {
-              if (typeof entry.dataKey === "string") toggle(entry.dataKey);
-            }}
-            formatter={(value, entry) => (
-              <span
-                className={hiddenSymbols.has(String(entry.dataKey)) ? "text-muted line-through" : "text-muted"}
-              >
-                {value}
-              </span>
-            )}
-          />
-          {items.map((item) => (
-            <Line
-              key={item.symbol}
-              type="monotone"
-              dataKey={item.symbol}
-              name={item.name}
-              stroke={colorBySymbol.get(item.symbol)}
-              strokeWidth={2}
-              dot={false}
-              connectNulls
-              hide={hiddenSymbols.has(item.symbol)}
-              isAnimationActive={false}
+    <div>
+      <div className="mb-1 flex justify-end">
+        <button type="button" onClick={toggleAll} className="text-xs font-semibold text-accent-dark">
+          {allHidden ? "Alle einblenden" : "Alle ausblenden"}
+        </button>
+      </div>
+
+      <div className="h-64">
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={points} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+            <XAxis
+              dataKey="date"
+              tick={{ fontSize: 11, fill: "#6b7684" }}
+              tickFormatter={(v: string) => new Date(v).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" })}
+              minTickGap={40}
+              axisLine={false}
+              tickLine={false}
             />
-          ))}
-        </LineChart>
-      </ResponsiveContainer>
+            <YAxis
+              width={40}
+              tick={{ fontSize: 11, fill: "#6b7684" }}
+              axisLine={false}
+              tickLine={false}
+              tickFormatter={(v: number) => `${v}%`}
+            />
+            <Tooltip content={<WatchlistTooltip currencyBySymbol={currencyBySymbol} />} />
+            <Legend
+              wrapperStyle={{ fontSize: 12, cursor: "pointer" }}
+              onClick={(entry) => {
+                if (typeof entry.dataKey === "string") toggle(entry.dataKey);
+              }}
+              formatter={(value, entry) => (
+                <span
+                  className={hiddenSymbols.has(String(entry.dataKey)) ? "text-muted line-through" : "text-muted"}
+                >
+                  {value}
+                </span>
+              )}
+            />
+            {items.map((item) => (
+              <Line
+                key={item.symbol}
+                type="monotone"
+                dataKey={item.symbol}
+                name={item.name}
+                stroke={colorBySymbol.get(item.symbol)}
+                strokeWidth={2}
+                dot={false}
+                connectNulls
+                hide={hiddenSymbols.has(item.symbol)}
+                isAnimationActive={false}
+              />
+            ))}
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 }
