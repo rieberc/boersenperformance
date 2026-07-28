@@ -4,8 +4,8 @@ import { useActionState, useEffect, useState, useTransition } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
-import { createAlertAction, deleteAlertAction, subscribePushAction } from "@/lib/actions/alerts";
-import { getExistingPushSubscription, subscribeToPush } from "@/lib/push/subscribe-client";
+import { createAlertAction, deleteAlertAction } from "@/lib/actions/alerts";
+import { usePushSubscription } from "@/lib/push/usePushSubscription";
 import { formatCurrency } from "@/lib/utils/currency";
 import type { WatchlistPerformanceItem } from "@/lib/portfolio/watchlist";
 
@@ -52,9 +52,7 @@ function AlertRow({ alert }: { alert: AlertSummary }) {
 export function AlertForm({ item, onBack }: { item: WatchlistPerformanceItem; onBack: () => void }) {
   const [direction, setDirection] = useState<AlertDirection>("ABOVE");
   const [state, action, pending] = useActionState(createAlertAction, undefined);
-  const [pushState, setPushState] = useState<"checking" | "subscribed" | "unsubscribed" | "subscribing">(
-    "checking",
-  );
+  const { state: pushState, enable: handleEnablePush } = usePushSubscription();
   const queryClient = useQueryClient();
 
   const { data } = useQuery({
@@ -68,12 +66,6 @@ export function AlertForm({ item, onBack }: { item: WatchlistPerformanceItem; on
   });
 
   useEffect(() => {
-    getExistingPushSubscription()
-      .then((sub) => setPushState(sub ? "subscribed" : "unsubscribed"))
-      .catch(() => setPushState("unsubscribed"));
-  }, []);
-
-  useEffect(() => {
     if (state === undefined) return;
     if (!state.error) {
       queryClient.invalidateQueries({ queryKey: ["alerts", item.symbol] });
@@ -81,21 +73,6 @@ export function AlertForm({ item, onBack }: { item: WatchlistPerformanceItem; on
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state]);
-
-  async function handleEnablePush() {
-    setPushState("subscribing");
-    try {
-      const subscription = await subscribeToPush();
-      const result = await subscribePushAction(subscription);
-      if (result.error) {
-        setPushState("unsubscribed");
-        return;
-      }
-      setPushState("subscribed");
-    } catch {
-      setPushState("unsubscribed");
-    }
-  }
 
   const alerts = data ?? [];
 

@@ -8,6 +8,7 @@ import { WatchlistChart, WATCHLIST_COLORS } from "@/components/watchlist/Watchli
 import { WatchlistRow } from "@/components/watchlist/WatchlistRow";
 import { WatchlistRangePicker } from "@/components/watchlist/WatchlistRangePicker";
 import { AddWatchlistItemFab } from "@/components/watchlist/AddWatchlistItemFab";
+import { PushPermissionBanner } from "@/components/watchlist/PushPermissionBanner";
 import { resolvePresetRange, type DateRangePreset } from "@/lib/utils/dateRange";
 import type { WatchlistPerformance } from "@/lib/portfolio/watchlist";
 
@@ -63,6 +64,8 @@ export function WatchlistView({
       </header>
 
       <main className="flex flex-col gap-4 px-5">
+        {!readOnly && <PushPermissionBanner />}
+
         <Card className="p-5">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-sm font-semibold text-navy">Wertentwicklung</h2>
