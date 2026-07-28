@@ -33,9 +33,17 @@ function toIsoDate(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
-export function DashboardView({ initialSummary }: { initialSummary: PortfolioSummary }) {
+export function DashboardView({
+  initialSummary,
+  basePath = "/api/portfolio",
+  readOnly = false,
+}: {
+  initialSummary: PortfolioSummary;
+  basePath?: string;
+  readOnly?: boolean;
+}) {
   const [importOpen, setImportOpen] = useState(false);
-  const [preset, setPreset] = useState<DateRangePreset>("sinceBuy");
+  const [preset, setPreset] = useState<DateRangePreset>("6m");
   const [customRange, setCustomRange] = useState(() => ({
     start: toIsoDate(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)),
     end: toIsoDate(new Date()),
@@ -44,9 +52,9 @@ export function DashboardView({ initialSummary }: { initialSummary: PortfolioSum
   const [chartTab, setChartTab] = useState<"value" | "drawdown">("value");
 
   const { data, isFetching, refetch } = useQuery({
-    queryKey: ["portfolio", "summary"],
+    queryKey: ["portfolio", "summary", basePath],
     queryFn: async (): Promise<PortfolioSummary> => {
-      const res = await fetch("/api/portfolio/summary");
+      const res = await fetch(`${basePath}/summary`);
       if (!res.ok) throw new Error("Laden fehlgeschlagen");
       return res.json();
     },
@@ -76,11 +84,11 @@ export function DashboardView({ initialSummary }: { initialSummary: PortfolioSum
   // Same queryKey/queryFn as PerformanceOverview so TanStack Query dedupes
   // this into a single request when both are mounted.
   const { data: performance } = useQuery({
-    queryKey: ["portfolio", "performance", rangeStartIso, rangeEndIso, typesParam ?? null],
+    queryKey: ["portfolio", "performance", basePath, rangeStartIso, rangeEndIso, typesParam ?? null],
     queryFn: async (): Promise<PerformanceOverviewData> => {
       const url = typesParam
-        ? `/api/portfolio/performance?start=${rangeStartIso}&end=${rangeEndIso}&types=${typesParam}`
-        : `/api/portfolio/performance?start=${rangeStartIso}&end=${rangeEndIso}`;
+        ? `${basePath}/performance?start=${rangeStartIso}&end=${rangeEndIso}&types=${typesParam}`
+        : `${basePath}/performance?start=${rangeStartIso}&end=${rangeEndIso}`;
       const res = await fetch(url);
       if (!res.ok) throw new Error("Laden fehlgeschlagen");
       return res.json();
@@ -104,56 +112,80 @@ export function DashboardView({ initialSummary }: { initialSummary: PortfolioSum
   return (
     <div className="mx-auto min-h-dvh w-full max-w-lg bg-background pb-28">
       <header className="safe-top flex items-center justify-between px-5 pt-6 pb-2">
-        <h1 className="text-lg font-bold text-navy">Mein Depot</h1>
+        <h1 className="text-lg font-bold text-navy">
+          Mein Depot
+          {readOnly && (
+            <span className="ml-2 rounded-full bg-accent-soft px-2 py-0.5 align-middle text-xs font-semibold text-accent-dark">
+              Demo
+            </span>
+          )}
+        </h1>
         <div className="flex items-center gap-1">
           <Link
-            href="/dashboard/performance"
+            href={readOnly ? "/demo/performance" : "/dashboard/performance"}
             aria-label="Performance im Verlauf"
             className="rounded-full p-2 text-navy hover:bg-black/5"
           >
             ↗
           </Link>
           <Link
-            href="/dashboard/watchlist"
+            href={readOnly ? "/demo/watchlist" : "/dashboard/watchlist"}
             aria-label="Watchlist"
             className="rounded-full p-2 text-navy hover:bg-black/5"
           >
             ★
           </Link>
-          <button
-            type="button"
-            aria-label="CSV importieren"
-            onClick={() => setImportOpen(true)}
-            className="rounded-full p-2 text-navy hover:bg-black/5"
-          >
-            ⇪
-          </button>
-          <a
-            href="/api/portfolio/export"
-            aria-label="Als Excel exportieren"
-            className="rounded-full p-2 text-navy hover:bg-black/5"
-          >
-            ⇩
-          </a>
-          <button
-            type="button"
-            aria-label="Aktualisieren"
-            onClick={() => refetch()}
-            className="rounded-full p-2 text-navy hover:bg-black/5"
-          >
-            <span className={isFetching ? "inline-block animate-spin" : ""}>⟳</span>
-          </button>
-          <form action={logoutAction}>
-            <button
-              type="submit"
-              aria-label="Abmelden"
-              className="rounded-full p-2 text-navy hover:bg-black/5"
+          {readOnly ? (
+            <Link
+              href="/register"
+              className="ml-1 rounded-full bg-accent px-3 py-1.5 text-sm font-semibold text-white"
             >
-              ⏻
-            </button>
-          </form>
+              Registrieren
+            </Link>
+          ) : (
+            <>
+              <button
+                type="button"
+                aria-label="CSV importieren"
+                onClick={() => setImportOpen(true)}
+                className="rounded-full p-2 text-navy hover:bg-black/5"
+              >
+                ⇪
+              </button>
+              <a
+                href="/api/portfolio/export"
+                aria-label="Als Excel exportieren"
+                className="rounded-full p-2 text-navy hover:bg-black/5"
+              >
+                ⇩
+              </a>
+              <button
+                type="button"
+                aria-label="Aktualisieren"
+                onClick={() => refetch()}
+                className="rounded-full p-2 text-navy hover:bg-black/5"
+              >
+                <span className={isFetching ? "inline-block animate-spin" : ""}>⟳</span>
+              </button>
+              <form action={logoutAction}>
+                <button
+                  type="submit"
+                  aria-label="Abmelden"
+                  className="rounded-full p-2 text-navy hover:bg-black/5"
+                >
+                  ⏻
+                </button>
+              </form>
+            </>
+          )}
         </div>
       </header>
+
+      {readOnly && (
+        <p className="px-5 pb-2 text-xs text-muted">
+          Das ist eine Demo mit Beispieldaten. Registriere dich kostenlos, um dein eigenes Depot zu verwalten.
+        </p>
+      )}
 
       {oldestUpdate && (
         <p className="px-5 pb-2 text-xs text-muted">
@@ -228,26 +260,28 @@ export function DashboardView({ initialSummary }: { initialSummary: PortfolioSum
           <div className="mb-3 border-b border-border" />
 
           {chartTab === "value" ? (
-            <PerformanceChart start={rangeStartIso} end={rangeEndIso} types={typesParam} />
+            <PerformanceChart start={rangeStartIso} end={rangeEndIso} types={typesParam} basePath={basePath} />
           ) : (
-            <DrawdownChart start={rangeStartIso} end={rangeEndIso} types={typesParam} />
+            <DrawdownChart start={rangeStartIso} end={rangeEndIso} types={typesParam} basePath={basePath} />
           )}
 
           <div className="my-4 border-t border-border" />
 
           <h2 className="mb-2 text-sm font-semibold text-navy">Rendite</h2>
-          <PerformanceOverview start={rangeStartIso} end={rangeEndIso} types={typesParam} />
+          <PerformanceOverview start={rangeStartIso} end={rangeEndIso} types={typesParam} basePath={basePath} />
         </Card>
 
         <Card className="p-2">
           <div className="flex items-center justify-between px-3 pt-2">
             <h2 className="text-sm font-semibold text-navy">Positionen</h2>
-            <Link href="/dashboard/activity" className="text-xs font-semibold text-accent-dark">
-              Aktivitäten →
-            </Link>
+            {!readOnly && (
+              <Link href="/dashboard/activity" className="text-xs font-semibold text-accent-dark">
+                Aktivitäten →
+              </Link>
+            )}
           </div>
           <div className="px-3">
-            <PositionsTable holdings={summary.holdings} />
+            <PositionsTable holdings={summary.holdings} readOnly={readOnly} />
           </div>
         </Card>
 
@@ -263,8 +297,12 @@ export function DashboardView({ initialSummary }: { initialSummary: PortfolioSum
         )}
       </main>
 
-      <AddHoldingFab />
-      <ImportCsvSheet open={importOpen} onClose={() => setImportOpen(false)} />
+      {!readOnly && (
+        <>
+          <AddHoldingFab />
+          <ImportCsvSheet open={importOpen} onClose={() => setImportOpen(false)} />
+        </>
+      )}
     </div>
   );
 }

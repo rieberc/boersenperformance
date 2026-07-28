@@ -8,6 +8,7 @@ import { WatchlistChart, WATCHLIST_COLORS } from "@/components/watchlist/Watchli
 import { WatchlistRow } from "@/components/watchlist/WatchlistRow";
 import { WatchlistRangePicker } from "@/components/watchlist/WatchlistRangePicker";
 import { AddWatchlistItemFab } from "@/components/watchlist/AddWatchlistItemFab";
+import { PushPermissionBanner } from "@/components/watchlist/PushPermissionBanner";
 import { resolvePresetRange, type DateRangePreset } from "@/lib/utils/dateRange";
 import type { WatchlistPerformance } from "@/lib/portfolio/watchlist";
 
@@ -17,7 +18,17 @@ function toIsoDate(d: Date): string {
 
 const DEFAULT_PRESET: DateRangePreset = "30d";
 
-export function WatchlistView({ initialPerformance }: { initialPerformance: WatchlistPerformance }) {
+export function WatchlistView({
+  initialPerformance,
+  basePath = "/api/watchlist",
+  backHref = "/dashboard",
+  readOnly = false,
+}: {
+  initialPerformance: WatchlistPerformance;
+  basePath?: string;
+  backHref?: string;
+  readOnly?: boolean;
+}) {
   const [preset, setPreset] = useState<DateRangePreset>(DEFAULT_PRESET);
 
   const range = resolvePresetRange(preset, null);
@@ -25,9 +36,9 @@ export function WatchlistView({ initialPerformance }: { initialPerformance: Watc
   const endIso = toIsoDate(range.end);
 
   const { data } = useQuery({
-    queryKey: ["watchlist", "performance", startIso, endIso],
+    queryKey: ["watchlist", "performance", basePath, startIso, endIso],
     queryFn: async (): Promise<WatchlistPerformance> => {
-      const res = await fetch(`/api/watchlist/performance?start=${startIso}&end=${endIso}`);
+      const res = await fetch(`${basePath}/performance?start=${startIso}&end=${endIso}`);
       if (!res.ok) throw new Error("Laden fehlgeschlagen");
       return res.json();
     },
@@ -43,7 +54,7 @@ export function WatchlistView({ initialPerformance }: { initialPerformance: Watc
     <div className="mx-auto min-h-dvh w-full max-w-lg bg-background pb-28">
       <header className="safe-top flex items-center gap-3 px-5 pt-6 pb-4">
         <Link
-          href="/dashboard"
+          href={backHref}
           aria-label="Zurück"
           className="rounded-full p-2 text-navy hover:bg-black/5"
         >
@@ -53,6 +64,8 @@ export function WatchlistView({ initialPerformance }: { initialPerformance: Watc
       </header>
 
       <main className="flex flex-col gap-4 px-5">
+        {!readOnly && <PushPermissionBanner />}
+
         <Card className="p-5">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-sm font-semibold text-navy">Wertentwicklung</h2>
@@ -74,7 +87,11 @@ export function WatchlistView({ initialPerformance }: { initialPerformance: Watc
             ) : (
               performance.items.map((item, index) => (
                 <div key={item.id} className={index > 0 ? "border-t border-border" : ""}>
-                  <WatchlistRow item={item} color={WATCHLIST_COLORS[index % WATCHLIST_COLORS.length]} />
+                  <WatchlistRow
+                    item={item}
+                    color={WATCHLIST_COLORS[index % WATCHLIST_COLORS.length]}
+                    readOnly={readOnly}
+                  />
                 </div>
               ))
             )}
@@ -82,7 +99,7 @@ export function WatchlistView({ initialPerformance }: { initialPerformance: Watc
         </Card>
       </main>
 
-      <AddWatchlistItemFab />
+      {!readOnly && <AddWatchlistItemFab />}
     </div>
   );
 }

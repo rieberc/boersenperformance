@@ -40,13 +40,23 @@ function formatPercent(value: number) {
   return `${(value * 100).toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
 }
 
-export function DrawdownChart({ start, end, types }: { start: string; end: string; types?: string }) {
+export function DrawdownChart({
+  start,
+  end,
+  types,
+  basePath = "/api/portfolio",
+}: {
+  start: string;
+  end: string;
+  types?: string;
+  basePath?: string;
+}) {
   const { data, isFetching } = useQuery({
-    queryKey: ["portfolio", "history", start, end, types ?? null],
+    queryKey: ["portfolio", "history", basePath, start, end, types ?? null],
     queryFn: async (): Promise<{ series: ValuePoint[] }> => {
       const url = types
-        ? `/api/portfolio/history?start=${start}&end=${end}&types=${types}`
-        : `/api/portfolio/history?start=${start}&end=${end}`;
+        ? `${basePath}/history?start=${start}&end=${end}&types=${types}`
+        : `${basePath}/history?start=${start}&end=${end}`;
       const res = await fetch(url);
       if (!res.ok) throw new Error("Laden fehlgeschlagen");
       return res.json();
